@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.ai import router as ai_router
 from src.api.employers import router as employers_router
 from src.api.jobs import router as jobs_router
 from src.api.stats import router as stats_router
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(jobs_router)
 app.include_router(employers_router)
 app.include_router(stats_router)
+app.include_router(ai_router)
 
 
 @app.get("/health")

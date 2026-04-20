@@ -25,6 +25,9 @@ lxml
 # Browser Automation
 playwright
 
+# MCP Server (requires Python 3.10+)
+mcp
+
 # Utilities
 python-dotenv
 
