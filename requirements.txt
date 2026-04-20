@@ -1,0 +1,33 @@
+# Core
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Database
+sqlalchemy[asyncio]
+asyncpg
+alembic
+psycopg2-binary
+
+# Task Queue
+celery[redis]
+redis
+
+# HTTP
+aiohttp
+httpx
+
+# HTML Parsing
+beautifulsoup4
+lxml
+
+# Browser Automation
+playwright
+
+# Utilities
+python-dotenv
+
+# Testing
+pytest
+pytest-asyncio
