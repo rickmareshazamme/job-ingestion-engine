@@ -28,6 +28,9 @@ playwright
 # MCP Server (requires Python 3.10+)
 mcp
 
+# Templates
+jinja2
+
 # Utilities
 python-dotenv
 

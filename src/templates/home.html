@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Search Millions of Jobs{% endblock %}
+{% block meta_description %}Free, open job search. Millions of jobs from corporate career sites indexed and AI-searchable. Greenhouse, Workday, Lever, and more.{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>Every job. Every ATS.<br>AI-searchable.</h1>
+    <p>We index millions of jobs from corporate career sites that are invisible to AI search — Workday, Greenhouse, Lever, Taleo, and more. Free forever.</p>
+
+    <form class="search-bar" action="/search" method="get">
+        <input type="text" name="q" placeholder="Job title, skill, or company..." aria-label="Search jobs" autofocus>
+        <button type="submit">Search Jobs</button>
+    </form>
+</section>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.active_jobs) }}</div>
+        <div class="stat-label">Active Jobs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ "{:,}".format(stats.total_employers) }}</div>
+        <div class="stat-label">Employers Indexed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.jobs_by_country | length }}+</div>
+        <div class="stat-label">Countries</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.jobs_by_ats | length }}</div>
+        <div class="stat-label">ATS Platforms</div>
+    </div>
+</div>
+{% endblock %}

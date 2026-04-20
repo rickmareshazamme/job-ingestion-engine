@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ q or "Search" }} Jobs{% endblock %}
+{% block meta_description %}Search results for {{ q or "all" }} jobs. {{ meta.total }} results found.{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <form class="search-bar" action="/search" method="get" style="margin-bottom: var(--space-xl);">
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="Job title, skill, or company..." aria-label="Search jobs">
+        <button type="submit">Search</button>
+    </form>
+
+    <div class="filters">
+        <select name="country" class="filter-select" onchange="this.form.submit()" form="filter-form">
+            <option value="">All Countries</option>
+            {% for code in ["US","GB","AU","DE","CA","FR","NL","IE","SG","IN","BR","JP"] %}
+            <option value="{{ code }}" {{ "selected" if filters.country == code }}>{{ code }}</option>
+            {% endfor %}
+        </select>
+
+        <a href="/search?{{ query_string }}&remote=true" class="filter-chip {{ 'active' if filters.remote }}">Remote</a>
+
+        <select class="filter-select" onchange="window.location='/search?{{ query_string }}&seniority='+this.value">
+            <option value="">All Levels</option>
+            {% for level in ["intern","junior","mid","senior","lead","principal","director","executive"] %}
+            <option value="{{ level }}" {{ "selected" if filters.seniority == level }}>{{ level | capitalize }}</option>
+            {% endfor %}
+        </select>
+
+        <select class="filter-select" onchange="window.location='/search?{{ query_string }}&employment_type='+this.value">
+            <option value="">All Types</option>
+            {% for etype in ["FULL_TIME","PART_TIME","CONTRACTOR","TEMPORARY","INTERN"] %}
+            <option value="{{ etype }}" {{ "selected" if filters.employment_type == etype }}>{{ etype | replace("_", " ") | capitalize }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <p class="results-meta">{{ "{:,}".format(meta.total) }} jobs found{% if q %} for "{{ q }}"{% endif %}</p>
+
+    <div class="job-list">
+        {% for job in jobs %}
+        <a href="/jobs/{{ job.id }}" class="job-card">
+            <div class="job-card-header">
+                <div>
+                    <h3>{{ job.title }}</h3>
+                    <span class="employer">{{ job.employer_name }}</span>
+                </div>
+                {% if job.salary.min %}
+                <span class="job-salary">
+                    {{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %}–{{ "{:,}".format(job.salary.max) }}{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            <div class="job-meta">
+                {% if job.location.city or job.location.country %}
+                <span class="tag">{{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}</span>
+                {% endif %}
+                {% if job.is_remote %}
+                <span class="tag remote">{{ job.remote_type | capitalize }}</span>
+                {% endif %}
+                {% if job.employment_type %}
+                <span class="tag">{{ job.employment_type | replace("_", " ") }}</span>
+                {% endif %}
+                {% if job.seniority %}
+                <span class="tag">{{ job.seniority | capitalize }}</span>
+                {% endif %}
+                {% for cat in job.categories[:2] %}
+                <span class="tag">{{ cat }}</span>
+                {% endfor %}
+                {% if job.ats_platform %}
+                <span class="tag">{{ job.ats_platform }}</span>
+                {% endif %}
+            </div>
+        </a>
+        {% else %}
+        <p style="text-align:center; color: var(--color-text-muted); padding: var(--space-2xl);">No jobs found. Try a different search.</p>
+        {% endfor %}
+    </div>
+
+    {% if meta.total_pages > 1 %}
+    <div class="pagination">
+        {% if meta.page > 1 %}
+        <a href="/search?{{ query_string }}&page={{ meta.page - 1 }}">Prev</a>
+        {% endif %}
+        {% for p in range(1, meta.total_pages + 1) %}
+            {% if p == meta.page %}
+            <span class="current">{{ p }}</span>
+            {% elif p <= 3 or p > meta.total_pages - 2 or (p >= meta.page - 1 and p <= meta.page + 1) %}
+            <a href="/search?{{ query_string }}&page={{ p }}">{{ p }}</a>
+            {% elif p == 4 or p == meta.total_pages - 2 %}
+            <span>...</span>
+            {% endif %}
+        {% endfor %}
+        {% if meta.page < meta.total_pages %}
+        <a href="/search?{{ query_string }}&page={{ meta.page + 1 }}">Next</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

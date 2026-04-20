@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}{{ job.title }} at {{ job.employer_name }}{% endblock %}
+{% block meta_description %}{{ job.title }} at {{ job.employer_name }} — {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}. {% if job.salary.min %}{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}–{{ "{:,}".format(job.salary.max) }}{% endif %}. {% endif %}Apply now.{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{{ json_ld | safe }}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="job-detail">
+    <h1>{{ job.title }}</h1>
+    <p class="employer-line">{{ job.employer_name }} · {{ job.employer_domain }}</p>
+
+    <div class="job-detail-meta">
+        {% if job.location.city or job.location.country %}
+        <div class="meta-item">
+            <span class="label">Location</span>
+            <span class="value">{{ job.location.raw or (job.location.city or "") + (", " if job.location.city and job.location.country else "") + (job.location.country or "") }}</span>
+        </div>
+        {% endif %}
+
+        {% if job.is_remote %}
+        <div class="meta-item">
+            <span class="label">Work Type</span>
+            <span class="value">{{ job.remote_type | capitalize }}</span>
+        </div>
+        {% endif %}
+
+        {% if job.salary.min %}
+        <div class="meta-item">
+            <span class="label">Salary</span>
+            <span class="value">{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %} – {{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} / {{ job.salary.period | lower }}{% endif %}</span>
+        </div>
+        {% endif %}
+
+        {% if job.employment_type %}
+        <div class="meta-item">
+            <span class="label">Type</span>
+            <span class="value">{{ job.employment_type | replace("_", " ") | capitalize }}</span>
+        </div>
+        {% endif %}
+
+        {% if job.seniority %}
+        <div class="meta-item">
+            <span class="label">Level</span>
+            <span class="value">{{ job.seniority | capitalize }}</span>
+        </div>
+        {% endif %}
+
+        {% if job.date_posted %}
+        <div class="meta-item">
+            <span class="label">Posted</span>
+            <span class="value">{{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else "Unknown" }}</span>
+        </div>
+        {% endif %}
+
+        {% if job.ats_platform %}
+        <div class="meta-item">
+            <span class="label">Source</span>
+            <span class="value">{{ job.ats_platform | capitalize }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if job.categories %}
+    <div class="job-meta" style="margin-bottom: var(--space-xl);">
+        {% for cat in job.categories %}
+        <span class="tag">{{ cat }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="job-description">
+        {{ job.description_html | safe if job.description_html else job.description_text or "No description available." }}
+    </div>
+
+    {% if job.source_url %}
+    <a href="{{ job.source_url }}" target="_blank" rel="noopener" class="apply-button">Apply on {{ job.ats_platform | capitalize if job.ats_platform else "Employer Site" }}</a>
+    {% endif %}
+</div>
+{% endblock %}

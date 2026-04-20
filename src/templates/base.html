@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Job Index{% endblock %} — Job Index</title>
+    <meta name="description" content="{% block meta_description %}Search millions of jobs from corporate career sites — free, open, and AI-searchable.{% endblock %}">
+    <link rel="canonical" href="{{ request.url }}">
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <header class="site-header">
+        <nav class="nav-container" aria-label="Main navigation">
+            <a href="/" class="logo">Job<span class="logo-accent">Index</span></a>
+            <div class="nav-links">
+                <a href="/search">Search</a>
+                <a href="/employers">Employers</a>
+                <a href="/docs" target="_blank">API</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-col">
+                <h4>Job Index</h4>
+                <p>Free, open, AI-native job search. Indexing millions of jobs from corporate ATS platforms.</p>
+            </div>
+            <div class="footer-col">
+                <h4>For Developers</h4>
+                <a href="/docs">REST API</a>
+                <a href="/llms.txt">llms.txt</a>
+                <a href="/.well-known/llm-info">LLM Info</a>
+                <a href="/openapi.json">OpenAPI Spec</a>
+            </div>
+            <div class="footer-col">
+                <h4>For Employers</h4>
+                <p>Your jobs are indexed automatically and free. <a href="/employers">Find your company</a>.</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>Jobs are indexed from public career pages. Data refreshed every 6–24 hours.</p>
+        </div>
+    </footer>
+</body>
+</html>
