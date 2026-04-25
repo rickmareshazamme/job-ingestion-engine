@@ -4,10 +4,13 @@ Public API: https://api.lever.co/v0/postings/{company}?mode=json
 No authentication required for public postings.
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
 
-from src.connectors.base import BaseConnector, RawJob
+from src.connectors.base import BaseConnector, PermanentError, RawJob
+
+logger = logging.getLogger("jobindex.connector.lever")
 
 
 class LeverConnector(BaseConnector):
@@ -17,14 +20,26 @@ class LeverConnector(BaseConnector):
 
     async def fetch_jobs(self, board_token: str, employer_domain: str) -> list[RawJob]:
         url = f"{self.BASE_URL}/{board_token}?mode=json"
-        jobs_data = await self._get_json(url)
+        logger.info("Fetching jobs from Lever board: %s", board_token)
+
+        try:
+            jobs_data = await self._get_json(url)
+        except PermanentError:
+            logger.error("Lever board not found or access denied: %s", board_token)
+            return []
 
         if not isinstance(jobs_data, list):
+            logger.warning("Lever %s: unexpected response type %s", board_token, type(jobs_data).__name__)
             return []
+
+        logger.info("Lever %s: found %d jobs", board_token, len(jobs_data))
 
         raw_jobs = []
         for job in jobs_data:
-            raw_jobs.append(self._normalize_job(job, board_token, employer_domain))
+            try:
+                raw_jobs.append(self._normalize_job(job, board_token, employer_domain))
+            except Exception as e:
+                logger.warning("Failed to normalize Lever job %s: %s", job.get("id", "?"), e)
 
         return raw_jobs
 

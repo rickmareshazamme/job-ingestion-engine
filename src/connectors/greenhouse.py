@@ -6,11 +6,13 @@ No authentication required for public job board API.
 Endpoint: GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlparse
 
-from src.connectors.base import BaseConnector, RawJob
+from src.connectors.base import BaseConnector, PermanentError, RawJob
+
+logger = logging.getLogger("jobindex.connector.greenhouse")
 
 
 class GreenhouseConnector(BaseConnector):
@@ -20,12 +22,23 @@ class GreenhouseConnector(BaseConnector):
 
     async def fetch_jobs(self, board_token: str, employer_domain: str) -> list[RawJob]:
         url = f"{self.BASE_URL}/{board_token}/jobs?content=true"
-        data = await self._get_json(url)
+        logger.info("Fetching jobs from Greenhouse board: %s", board_token)
+
+        try:
+            data = await self._get_json(url)
+        except PermanentError:
+            logger.error("Board not found or access denied: %s", board_token)
+            return []
+
         jobs_data = data.get("jobs", [])
+        logger.info("Greenhouse %s: found %d jobs", board_token, len(jobs_data))
 
         raw_jobs = []
         for job in jobs_data:
-            raw_jobs.append(self._normalize_job(job, board_token, employer_domain))
+            try:
+                raw_jobs.append(self._normalize_job(job, board_token, employer_domain))
+            except Exception as e:
+                logger.warning("Failed to normalize Greenhouse job %s: %s", job.get("id", "?"), e)
 
         return raw_jobs
 
@@ -33,7 +46,8 @@ class GreenhouseConnector(BaseConnector):
         url = f"{self.BASE_URL}/{board_token}"
         try:
             return await self._get_json(url)
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to fetch company info for %s: %s", board_token, e)
             return None
 
     def _normalize_job(self, job: dict, board_token: str, employer_domain: str) -> RawJob:

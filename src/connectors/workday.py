@@ -7,10 +7,13 @@ This is the highest-value connector — covers ~40% of Fortune 500.
 The API accepts POST with pagination params and returns job listings.
 """
 
+import logging
 from datetime import datetime
 from typing import Optional
 
-from src.connectors.base import BaseConnector, RawJob
+from src.connectors.base import BaseConnector, PermanentError, RawJob
+
+logger = logging.getLogger("jobindex.connector.workday")
 
 
 class WorkdayConnector(BaseConnector):
@@ -21,7 +24,6 @@ class WorkdayConnector(BaseConnector):
         """
         board_token format: "{company}|{instance}|{site}"
         Example: "microsoft|5|External"
-        instance is the wd number (1-5)
         """
         parts = board_token.split("|")
         if len(parts) != 3:
@@ -30,6 +32,8 @@ class WorkdayConnector(BaseConnector):
         company, instance, site = parts
         base_url = f"https://{company}.wd{instance}.myworkdayjobs.com"
         jobs_url = f"{base_url}/wday/cxs/{company}/{site}/jobs"
+
+        logger.info("Fetching jobs from Workday: %s (instance wd%s)", company, instance)
 
         all_jobs: list[RawJob] = []
         offset = 0
@@ -43,25 +47,27 @@ class WorkdayConnector(BaseConnector):
                 "searchText": "",
             }
 
-            session = await self._get_session()
-            async with session.post(
-                jobs_url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            ) as resp:
-                resp.raise_for_status()
-                data = await resp.json()
+            try:
+                data = await self._post_json(jobs_url, payload)
+            except PermanentError:
+                logger.error("Workday career site not found: %s", jobs_url)
+                return []
 
             job_postings = data.get("jobPostings", [])
             total = data.get("total", 0)
 
             for job in job_postings:
-                raw_job = self._normalize_listing(job, company, instance, site, base_url, employer_domain)
-                all_jobs.append(raw_job)
+                try:
+                    raw_job = self._normalize_listing(job, company, instance, site, base_url, employer_domain)
+                    all_jobs.append(raw_job)
+                except Exception as e:
+                    logger.warning("Failed to normalize Workday listing: %s", e)
 
             offset += limit
             if offset >= total or not job_postings:
                 break
+
+        logger.info("Workday %s: found %d listings, fetching details...", company, len(all_jobs))
 
         # Fetch full details for each job
         detailed_jobs = []
@@ -69,6 +75,7 @@ class WorkdayConnector(BaseConnector):
             detailed = await self._fetch_detail(raw_job, base_url, company, site)
             detailed_jobs.append(detailed)
 
+        logger.info("Workday %s: completed with %d jobs", company, len(detailed_jobs))
         return detailed_jobs
 
     async def _fetch_detail(
@@ -111,8 +118,10 @@ class WorkdayConnector(BaseConnector):
 
             raw_job.raw_data.update({"jobPostingInfo": job_detail})
 
-        except Exception:
-            pass
+        except PermanentError:
+            logger.warning("Job detail not found: %s", detail_url)
+        except Exception as e:
+            logger.warning("Failed to fetch Workday job detail %s: %s", external_path, str(e)[:100])
 
         return raw_job
 
