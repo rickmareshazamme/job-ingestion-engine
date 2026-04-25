@@ -1,35 +1,50 @@
 {% extends "base.html" %}
 
-{% block title %}Search Millions of Jobs{% endblock %}
-{% block meta_description %}Free, open job search. Millions of jobs from corporate career sites indexed and AI-searchable. Greenhouse, Workday, Lever, and more.{% endblock %}
+{% block title %}JobIndex — Every Job, Every ATS, AI-Searchable{% endblock %}
+{% block meta_description %}Free global job index. Every corporate career site — Workday, Greenhouse, Lever, Taleo — indexed and searchable by AI.{% endblock %}
 
 {% block content %}
 <section class="hero">
-    <h1>Every job. Every ATS.<br>AI-searchable.</h1>
-    <p>We index millions of jobs from corporate career sites that are invisible to AI search — Workday, Greenhouse, Lever, Taleo, and more. Free forever.</p>
+    <div class="hero-badge">
+        <span class="dot"></span>
+        Indexing {{ "{:,}".format(stats.active_jobs) }} jobs from {{ "{:,}".format(stats.total_employers) }} employers
+    </div>
 
-    <form class="search-bar" action="/search" method="get">
-        <input type="text" name="q" placeholder="Job title, skill, or company..." aria-label="Search jobs" autofocus>
-        <button type="submit">Search Jobs</button>
-    </form>
+    <h1>Every job.<br>AI-searchable.</h1>
+    <p>We index corporate career sites that are invisible to AI search — Workday, Greenhouse, Lever, Taleo, and 12 more ATS platforms. Free forever.</p>
+
+    <div class="search-container">
+        <form class="search-bar" action="/search" method="get">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" name="q" placeholder="Try: remote Python engineer over 120K..." aria-label="Search jobs" autofocus>
+            <button type="submit">Search</button>
+        </form>
+        <p class="search-hint">
+            Try: <code>senior data engineer in Sydney</code> or <code>remote DevOps $150k+</code>
+        </p>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-item">
+            <div class="stat-value">{{ "{:,}".format(stats.active_jobs) }}</div>
+            <div class="stat-label">Active Jobs</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ "{:,}".format(stats.total_employers) }}</div>
+            <div class="stat-label">Employers</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ stats.jobs_by_country | length }}+</div>
+            <div class="stat-label">Countries</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">16</div>
+            <div class="stat-label">ATS Platforms</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">$0</div>
+            <div class="stat-label">For Employers</div>
+        </div>
+    </div>
 </section>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-number">{{ "{:,}".format(stats.active_jobs) }}</div>
-        <div class="stat-label">Active Jobs</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ "{:,}".format(stats.total_employers) }}</div>
-        <div class="stat-label">Employers Indexed</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ stats.jobs_by_country | length }}+</div>
-        <div class="stat-label">Countries</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ stats.jobs_by_ats | length }}</div>
-        <div class="stat-label">ATS Platforms</div>
-    </div>
-</div>
 {% endblock %}

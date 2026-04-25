@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}{{ job.title }} at {{ job.employer_name }}{% endblock %}
-{% block meta_description %}{{ job.title }} at {{ job.employer_name }} — {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}. {% if job.salary.min %}{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}–{{ "{:,}".format(job.salary.max) }}{% endif %}. {% endif %}Apply now.{% endblock %}
+{% block title %}{{ job.title }} at {{ job.employer_name }} — JobIndex{% endblock %}
+{% block meta_description %}{{ job.title }} at {{ job.employer_name }}. {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}. {% if job.salary.min %}{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}-{{ "{:,}".format(job.salary.max) }}{% endif %}. {% endif %}Apply now.{% endblock %}
 
 {% block head_extra %}
 <script type="application/ld+json">
@@ -11,8 +11,13 @@
 
 {% block content %}
 <div class="job-detail">
+    <a href="/search" style="font-size: var(--text-sm); color: var(--color-text-muted); display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 1.5rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7"/></svg>
+        Back to search
+    </a>
+
     <h1>{{ job.title }}</h1>
-    <p class="employer-line">{{ job.employer_name }} · {{ job.employer_domain }}</p>
+    <p class="employer-line">{{ job.employer_name }}{% if job.employer_domain %} <span style="color: var(--color-text-muted);">&middot; {{ job.employer_domain }}</span>{% endif %}</p>
 
     <div class="job-detail-meta">
         {% if job.location.city or job.location.country %}
@@ -25,14 +30,14 @@
         {% if job.is_remote %}
         <div class="meta-item">
             <span class="label">Work Type</span>
-            <span class="value">{{ job.remote_type | capitalize }}</span>
+            <span class="value" style="color: var(--color-remote);">{{ job.remote_type | capitalize }}</span>
         </div>
         {% endif %}
 
         {% if job.salary.min %}
         <div class="meta-item">
             <span class="label">Salary</span>
-            <span class="value">{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %} – {{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} / {{ job.salary.period | lower }}{% endif %}</span>
+            <span class="value" style="color: var(--color-salary);">{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %} - {{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} / {{ job.salary.period | lower }}{% endif %}</span>
         </div>
         {% endif %}
 
@@ -53,7 +58,7 @@
         {% if job.date_posted %}
         <div class="meta-item">
             <span class="label">Posted</span>
-            <span class="value">{{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else "Unknown" }}</span>
+            <span class="value">{{ job.date_posted.strftime('%b %d, %Y') if job.date_posted else "" }}</span>
         </div>
         {% endif %}
 
@@ -66,7 +71,7 @@
     </div>
 
     {% if job.categories %}
-    <div class="job-meta" style="margin-bottom: var(--space-xl);">
+    <div class="job-meta" style="margin-bottom: 2rem;">
         {% for cat in job.categories %}
         <span class="tag">{{ cat }}</span>
         {% endfor %}
@@ -74,11 +79,14 @@
     {% endif %}
 
     <div class="job-description">
-        {{ job.description_html | safe if job.description_html else job.description_text or "No description available." }}
+        {{ job.description_html | safe if job.description_html else job.description_text or "<p style='color: var(--color-text-muted);'>No description available. Visit the employer's career page for details.</p>" }}
     </div>
 
     {% if job.source_url %}
-    <a href="{{ job.source_url }}" target="_blank" rel="noopener" class="apply-button">Apply on {{ job.ats_platform | capitalize if job.ats_platform else "Employer Site" }}</a>
+    <a href="{{ job.source_url }}" target="_blank" rel="noopener" class="apply-button">
+        Apply on {{ job.ats_platform | capitalize if job.ats_platform else "employer site" }}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
+    </a>
     {% endif %}
 </div>
 {% endblock %}
