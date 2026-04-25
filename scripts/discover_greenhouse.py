@@ -163,6 +163,14 @@ def main():
 
     tokens = list(set(KNOWN_BOARDS))
 
+    # Always load from data file if it exists
+    data_file = Path(__file__).parent.parent / "data" / "greenhouse_tokens.txt"
+    if data_file.exists():
+        with open(data_file) as f:
+            extra = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        tokens = list(set(tokens + extra))
+        logger.info("Loaded %d tokens from data/greenhouse_tokens.txt", len(extra))
+
     if file_arg:
         path = Path(file_arg)
         if path.exists():

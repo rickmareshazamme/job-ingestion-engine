@@ -165,6 +165,15 @@ def main():
     test_only = "--test" in sys.argv
     slugs = list(set(COMPANY_SLUGS))
 
+    # Load from data file
+    from pathlib import Path
+    data_file = Path(__file__).parent.parent / "data" / "workday_slugs.txt"
+    if data_file.exists():
+        with open(data_file) as f:
+            extra = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        slugs = list(set(slugs + extra))
+        logger.info("Loaded %d slugs from data/workday_slugs.txt", len(extra))
+
     logger.info("Probing %d company slugs for Workday instances...", len(slugs))
     valid = asyncio.run(discover(slugs))
     logger.info("Found %d Workday instances out of %d probed", len(valid), len(slugs))

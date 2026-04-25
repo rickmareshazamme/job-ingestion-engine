@@ -23,10 +23,15 @@ import sys
 from src.connectors.adzuna import AdzunaConnector
 from src.connectors.arbeitnow import ArbeitnowConnector
 from src.connectors.ashby import AshbyConnector
+from src.connectors.careerjet import CareerjetConnector
 from src.connectors.greenhouse import GreenhouseConnector
+from src.connectors.jooble import JoobleConnector
 from src.connectors.lever import LeverConnector
+from src.connectors.personio import PersonioConnector
+from src.connectors.recruitee import RecruiteeConnector
 from src.connectors.reed import ReedConnector
 from src.connectors.remoteok import RemoteOKConnector
+from src.connectors.smartrecruiters import SmartRecruitersConnector
 from src.connectors.themuse import TheMuseConnector
 from src.connectors.usajobs import USAJobsConnector
 from src.connectors.workable import WorkableConnector
@@ -34,17 +39,24 @@ from src.connectors.workday import WorkdayConnector
 from src.normalizer.pipeline import normalize_job
 
 CONNECTORS = {
+    # ATS
     "greenhouse": GreenhouseConnector,
     "lever": LeverConnector,
     "workday": WorkdayConnector,
     "ashby": AshbyConnector,
     "workable": WorkableConnector,
+    "smartrecruiters": SmartRecruitersConnector,
+    "recruitee": RecruiteeConnector,
+    "personio": PersonioConnector,
+    # Aggregators
     "adzuna": AdzunaConnector,
     "remoteok": RemoteOKConnector,
     "arbeitnow": ArbeitnowConnector,
     "themuse": TheMuseConnector,
     "usajobs": USAJobsConnector,
     "reed": ReedConnector,
+    "jooble": JoobleConnector,
+    "careerjet": CareerjetConnector,
 }
 
 

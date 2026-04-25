@@ -22,10 +22,15 @@ from src.connectors.base import PermanentError, RateLimitError, RawJob
 from src.connectors.adzuna import AdzunaConnector
 from src.connectors.arbeitnow import ArbeitnowConnector
 from src.connectors.ashby import AshbyConnector
+from src.connectors.careerjet import CareerjetConnector
 from src.connectors.greenhouse import GreenhouseConnector
+from src.connectors.jooble import JoobleConnector
 from src.connectors.lever import LeverConnector
+from src.connectors.personio import PersonioConnector
+from src.connectors.recruitee import RecruiteeConnector
 from src.connectors.reed import ReedConnector
 from src.connectors.remoteok import RemoteOKConnector
+from src.connectors.smartrecruiters import SmartRecruitersConnector
 from src.connectors.themuse import TheMuseConnector
 from src.connectors.usajobs import USAJobsConnector
 from src.connectors.workable import WorkableConnector
@@ -48,19 +53,24 @@ celery_app.conf.update(
 )
 
 CONNECTOR_MAP = {
-    # ATS direct APIs
+    # ATS direct APIs (highest quality — structured data from source)
     "greenhouse_api": GreenhouseConnector,
     "lever_api": LeverConnector,
     "workday_feed": WorkdayConnector,
     "ashby_api": AshbyConnector,
     "workable_api": WorkableConnector,
-    # Aggregator APIs
+    "smartrecruiters_sitemap": SmartRecruitersConnector,
+    "recruitee_api": RecruiteeConnector,
+    "personio_xml": PersonioConnector,
+    # Aggregator APIs (volume — millions of jobs)
     "adzuna_api": AdzunaConnector,
     "remoteok_api": RemoteOKConnector,
     "arbeitnow_api": ArbeitnowConnector,
     "themuse_api": TheMuseConnector,
     "usajobs_api": USAJobsConnector,
     "reed_api": ReedConnector,
+    "jooble_api": JoobleConnector,
+    "careerjet_api": CareerjetConnector,
 }
 
 # Circuit breaker: max consecutive failures before pausing a source
