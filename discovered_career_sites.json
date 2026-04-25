@@ -1,0 +1,9 @@
+[
+  {
+    "domain": "stripe.com",
+    "career_url": "https://boards-api.greenhouse.io/v1/boards/stripe",
+    "ats_platform": "greenhouse",
+    "connector_type": "greenhouse_api",
+    "board_token": "stripe"
+  }
+]
