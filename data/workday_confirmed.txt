@@ -1,0 +1,131 @@
+# Confirmed Workday career site slugs with correct instance + site path
+# Format: slug|instance|site_path
+# Source: web research, confirmed URLs
+# These are VERIFIED — the slug and instance number are correct
+
+# ─── Technology ──────────────────────────────────────
+workday|5|Workday
+salesforce|12|External_Career_Site
+adobe|5|external_experienced
+dell|1|External
+vmware|1|VMware
+broadcom|1|External_Career
+hpe|5|Jobsathpe
+hp|5|ExternalCareerSite
+cisco|5|cisco_careers
+autodesk|1|uni
+snapchat|1|snap
+epicgames|5|Epic_Games
+amat|1|External
+micron|1|External
+netflix|108|Netflix
+
+# ─── Financial Services ──────────────────────────────
+ms|5|External
+wf|1|WellsFargoJobs
+db|3|DBWebsite
+citi|5|2
+capitalone|1|Capital_One
+usbank|1|US_Bank_Careers
+fifththird|5|53careers
+pnc|5|External
+mastercard|1|CorporateCareers
+paypal|1|jobs
+fmr|1|FidelityCareers
+capgroup|1|capitalgroupcareers
+aig|1|aig
+allstate|5|allstate_careers
+
+# ─── Pharma & Biotech ───────────────────────────────
+pfizer|1|PfizerCareers
+msd|5|SearchJobs
+bristolmyerssquibb|5|BMS
+astrazeneca|3|Careers
+sanofi|3|SanofiCareers
+amgen|1|Careers
+biibhr|3|external
+
+# ─── Healthcare & Insurance ──────────────────────────
+cigna|5|cignacareers
+elevancehealth|1|ANT
+humana|5|Humana_External_Career_Site
+centene|5|Centene_External
+medtronic|1|MedtronicCareers
+mckesson|3|External_Careers
+cardinalhealth|1|EXT
+trinityhealth|1|Jobs
+massgeneralbrigham|1|MGBExternal
+sanford|5|SanfordHealth
+davita|1|DKC_External
+bdx|1|EXTERNAL_CAREER_SITE_USA
+baxter|1|baxter
+danaher|1|DanaherJobs
+
+# ─── Retail ──────────────────────────────────────────
+walmart|5|WalmartExternal
+target|5|targetcareers
+nordstrom|5|nordstrom_careers
+tjx|1|TJX_EXTERNAL
+gapinc|1|GAPINC
+zillow|5|Zillow_Group_External
+wholefoods|5|wholefoods
+sysco|5|syscocareers
+
+# ─── Defense & Aerospace ────────────────────────────
+boeing|1|EXTERNAL_CAREERS
+globalhr|5|REC_RTX_Ext_Gateway
+ngc|1|Northrop_Grumman_External_Site
+bah|1|BAH_Jobs
+leidos|5|External
+ag|3|Airbus
+thales|3|Careers
+
+# ─── Media & Entertainment ──────────────────────────
+disney|5|disneycareer
+comcast|5|Comcast_Careers
+warnerbros|5|global
+nexstar|5|nexstar
+
+# ─── Energy & Utilities ─────────────────────────────
+chevron|5|jobs
+dukeenergy|1|search
+
+# ─── Consulting ─────────────────────────────────────
+accenture|103|AccentureCareers
+pwc|3|Global_Experienced_Careers
+
+# ─── Automotive ─────────────────────────────────────
+toyota|5|TMNA
+generalmotors|5|Careers_GM
+
+# ─── Industrial & Manufacturing ─────────────────────
+cat|5|CaterpillarCareers
+haier|3|GE_Appliances
+tysonfoods|5|TSN
+3m|1|Search
+illumina|1|illumina-careers
+ptc|1|PTC
+
+# ─── Consumer Goods ─────────────────────────────────
+unilever|3|UK_TemporaryWorkersite
+conagrabrands|1|Careers_US
+mdlz|3|External
+
+# ─── Other Major ────────────────────────────────────
+fedex|1|FXE-LAC_External_Career_Site
+jll|1|jllcareers
+grubhub|1|External
+bostondynamics|1|Boston_Dynamics
+broadridge|5|Careers
+liveramp|5|LiveRampCareers
+gen|1|careers
+collegeboard|1|Careers
+cnx|1|external_global
+airliquidehr|3|AirLiquideExternalCareer
+
+# ─── Government & Education ─────────────────────────
+nc|108|NC_Careers
+oregon|5|SOR_External_Career_Site
+wsu|5|WSU_Jobs
+lsu|1|LSU
+psu|1|PSU_Staff
