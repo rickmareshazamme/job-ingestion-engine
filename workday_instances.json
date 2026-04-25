@@ -1,0 +1,23 @@
+[
+  {
+    "company": "intel",
+    "instance": 1,
+    "total_jobs": 760,
+    "board_token": "intel|1|External",
+    "url": "https://intel.wd1.myworkdayjobs.com"
+  },
+  {
+    "company": "conocophillips",
+    "instance": 1,
+    "total_jobs": 19,
+    "board_token": "conocophillips|1|External",
+    "url": "https://conocophillips.wd1.myworkdayjobs.com"
+  },
+  {
+    "company": "tmobile",
+    "instance": 1,
+    "total_jobs": 1537,
+    "board_token": "tmobile|1|External",
+    "url": "https://tmobile.wd1.myworkdayjobs.com"
+  }
+]

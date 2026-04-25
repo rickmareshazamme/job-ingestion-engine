@@ -54,8 +54,8 @@ class GreenhouseConnector(BaseConnector):
         location = job.get("location", {})
         location_name = location.get("name", "") if isinstance(location, dict) else str(location)
 
-        departments = job.get("departments", [])
-        categories = [d.get("name", "") for d in departments if d.get("name")]
+        departments = job.get("departments") or []
+        categories = [d.get("name", "") for d in departments if isinstance(d, dict) and d.get("name")]
 
         metadata = job.get("metadata", [])
         salary_raw = None

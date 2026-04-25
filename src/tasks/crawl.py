@@ -19,8 +19,16 @@ from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.connectors.base import PermanentError, RateLimitError, RawJob
+from src.connectors.adzuna import AdzunaConnector
+from src.connectors.arbeitnow import ArbeitnowConnector
+from src.connectors.ashby import AshbyConnector
 from src.connectors.greenhouse import GreenhouseConnector
 from src.connectors.lever import LeverConnector
+from src.connectors.reed import ReedConnector
+from src.connectors.remoteok import RemoteOKConnector
+from src.connectors.themuse import TheMuseConnector
+from src.connectors.usajobs import USAJobsConnector
+from src.connectors.workable import WorkableConnector
 from src.connectors.workday import WorkdayConnector
 from src.models import CrawlRun, Job, SourceConfig
 from src.normalizer.pipeline import normalize_job
@@ -40,9 +48,19 @@ celery_app.conf.update(
 )
 
 CONNECTOR_MAP = {
+    # ATS direct APIs
     "greenhouse_api": GreenhouseConnector,
     "lever_api": LeverConnector,
     "workday_feed": WorkdayConnector,
+    "ashby_api": AshbyConnector,
+    "workable_api": WorkableConnector,
+    # Aggregator APIs
+    "adzuna_api": AdzunaConnector,
+    "remoteok_api": RemoteOKConnector,
+    "arbeitnow_api": ArbeitnowConnector,
+    "themuse_api": TheMuseConnector,
+    "usajobs_api": USAJobsConnector,
+    "reed_api": ReedConnector,
 }
 
 # Circuit breaker: max consecutive failures before pausing a source
