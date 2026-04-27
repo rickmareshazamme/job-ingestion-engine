@@ -581,6 +581,47 @@ def validate_active_job_urls(sample_size: int = 500):
 
 
 @celery_app.task
+def backfill_coords(batch_size: int = 5000):
+    """Resolve location_city + location_country to lat/lng via GeoNames cities500.
+    Idempotent — only touches rows where lat/lng is currently NULL.
+
+    Runs every 30 min; 5K rows/batch keeps the worker responsive. After a
+    fresh seed, it'll take ~12 batches to backfill 60K jobs.
+    """
+    from sqlalchemy import text as sql_text
+    from src.geo.cities import lookup as city_lookup
+
+    session = _get_sync_session()
+    try:
+        rows = session.execute(sql_text("""
+            SELECT id, location_city, location_country
+              FROM jobs
+             WHERE status = 'active'
+               AND location_lat IS NULL
+               AND location_city IS NOT NULL
+               AND location_city != ''
+               AND location_country IS NOT NULL
+             LIMIT :limit
+        """), {"limit": batch_size}).all()
+
+        filled = 0
+        for jid, city, country in rows:
+            coords = city_lookup(country, city)
+            if coords:
+                lat, lng = coords
+                session.execute(sql_text("""
+                    UPDATE jobs SET location_lat = :lat, location_lng = :lng
+                     WHERE id = :id
+                """), {"lat": lat, "lng": lng, "id": jid})
+                filled += 1
+        session.commit()
+        logger.info("backfill_coords: %d/%d rows resolved", filled, len(rows))
+        return {"checked": len(rows), "resolved": filled}
+    finally:
+        session.close()
+
+
+@celery_app.task
 def link_employers():
     """Auto-create Employer rows for any (employer_domain, employer_name) pair
     seen in jobs but not yet in the employer table, then link Job.employer_id.

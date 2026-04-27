@@ -26,6 +26,13 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.crawl.link_employers",
         "schedule": crontab(minute="*/30"),
     },
+    # Every 30 min: resolve city/country to lat/lng via GeoNames so jobs
+    # show up on /map. Idempotent + bounded to 5K rows per run.
+    "backfill-coords": {
+        "task": "src.tasks.crawl.backfill_coords",
+        "schedule": crontab(minute="*/30"),
+        "kwargs": {"batch_size": 5000},
+    },
     # Weekly Common Crawl JobPosting harvest — Sundays 04:00 UTC.
     # Heavy job: streams multi-GB WDC files, can take 1-3 hours.
     "harvest-common-crawl": {
