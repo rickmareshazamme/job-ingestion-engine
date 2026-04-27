@@ -1,0 +1,14 @@
+# Bullhorn customer corporationId table.
+# Populated by scripts/discover_bullhorn.py. Format:
+#   slug,corp_id,swimlane,public_url,name
+#
+# Used by src/connectors/bullhorn.py to skip the public-board HTML scrape
+# and hit public-rest{swimlane}.bullhornstaffing.com directly.
+#
+# Strategies for filling this table:
+#   1. python3 -m scripts.discover_bullhorn --slugs                 (~5 min, ~50-100 confirmed)
+#   2. python3 -m scripts.discover_bullhorn --enumerate              (~2h, ~6000-8000 confirmed)
+#   3. Hand-add rows from a partner-supplied list (one per line)
+#   4. Run career-site-grader against staffing-agency domain lists, then add the Bullhorn ones
+#
+# Add your 100 known clients below this line as you confirm them.

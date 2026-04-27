@@ -29,9 +29,12 @@ Robert Half, Insight Global, Aerotek, etc).
 
 from __future__ import annotations
 
+import csv
 import logging
+import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import aiohttp
@@ -40,6 +43,41 @@ from src.config import settings
 from src.connectors.base import BaseConnector, PermanentError, RawJob
 
 logger = logging.getLogger("jobindex.connector.bullhorn")
+
+# `data/bullhorn_corps.txt` is a CSV of pre-discovered (slug, corp_id,
+# swimlane, public_url, name) tuples. Lets us skip the HTML scrape and
+# hit public-rest directly. One line per staffing-agency board. Comments
+# start with #. Created by scripts/discover_bullhorn.py.
+_CORP_TABLE_PATH = Path(__file__).resolve().parents[2] / "data" / "bullhorn_corps.txt"
+
+
+def _load_corp_table() -> dict[str, dict]:
+    """Load (slug -> {corp_id, swimlane, public_url, name}) from the data file.
+    Returns {} if the file doesn't exist (connector falls back to HTML scrape).
+    """
+    if not _CORP_TABLE_PATH.exists():
+        return {}
+    table: dict[str, dict] = {}
+    with open(_CORP_TABLE_PATH, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(
+            (l for l in f if l.strip() and not l.startswith("#")),
+            fieldnames=["slug", "corp_id", "swimlane", "public_url", "name"],
+        )
+        for row in reader:
+            slug = (row.get("slug") or "").strip().lower()
+            if slug:
+                table[slug] = {
+                    "corp_id": (row.get("corp_id") or "").strip(),
+                    "swimlane": (row.get("swimlane") or "").strip() or None,
+                    "public_url": (row.get("public_url") or "").strip(),
+                    "name": (row.get("name") or "").strip(),
+                }
+    logger.info("Bullhorn corp table: loaded %d entries", len(table))
+    return table
+
+
+# Loaded once at import — refresh by restarting the worker.
+CORP_TABLE = _load_corp_table()
 
 
 class BullhornConnector(BaseConnector):
@@ -79,22 +117,41 @@ class BullhornConnector(BaseConnector):
         return self._session
 
     async def fetch_jobs(self, board_token: str, employer_domain: str) -> list[RawJob]:
-        """board_token is the company subdomain, e.g. 'kforce' for kforce.bullhornstaffing.com."""
+        """board_token can be:
+          - a slug listed in data/bullhorn_corps.txt → fast path, skip HTML scrape
+          - a bare slug → fall back to scraping {slug}.bullhornstaffing.com/jobs
+          - a literal "corp_id@swimlane" pair → hit REST directly with that tuple
+        """
         if not board_token:
             logger.warning("Bullhorn: no board_token provided")
             return []
 
-        try:
-            corp_id, swimlane = await self._discover_board(board_token)
-        except PermanentError as e:
-            logger.warning("Bullhorn board %s unavailable: %s", board_token, e)
-            return []
-        except Exception as e:
-            logger.error("Bullhorn board %s discovery failed: %s", board_token, str(e)[:200])
-            return []
+        corp_id: Optional[str] = None
+        swimlane: Optional[str] = None
+        public_url: Optional[str] = None
+
+        # 1. Fast path: literal "corp_id@swimlane" passed in
+        if "@" in board_token and board_token.split("@", 1)[0].isdigit():
+            corp_id, swimlane = board_token.split("@", 1)
+        # 2. Fast path: slug exists in data/bullhorn_corps.txt
+        elif board_token.lower() in CORP_TABLE:
+            row = CORP_TABLE[board_token.lower()]
+            corp_id = row.get("corp_id") or None
+            swimlane = row.get("swimlane")
+            public_url = row.get("public_url") or None
+        # 3. Slow path: scrape the public board
+        else:
+            try:
+                corp_id, swimlane = await self._discover_board(board_token)
+            except PermanentError as e:
+                logger.warning("Bullhorn board %s unavailable: %s", board_token, e)
+                return []
+            except Exception as e:
+                logger.error("Bullhorn board %s discovery failed: %s", board_token, str(e)[:200])
+                return []
 
         if not corp_id:
-            logger.warning("Bullhorn board %s: corporationId not found in HTML", board_token)
+            logger.warning("Bullhorn board %s: corporationId not found", board_token)
             return []
 
         rest_host = f"public-rest{swimlane}.bullhornstaffing.com" if swimlane else "public-rest40.bullhornstaffing.com"
