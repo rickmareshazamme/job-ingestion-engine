@@ -62,8 +62,9 @@ async def crawl_free_sources():
     return all_jobs
 
 
-async def crawl_greenhouse(max_boards: int = 50):
-    """Crawl discovered Greenhouse boards."""
+async def crawl_greenhouse(max_boards: int = 50, concurrency: int = 20):
+    """Crawl discovered Greenhouse boards in parallel."""
+    import asyncio
     from src.connectors.greenhouse import GreenhouseConnector
 
     boards_file = Path("greenhouse_boards.json")
@@ -74,23 +75,43 @@ async def crawl_greenhouse(max_boards: int = 50):
     with open(boards_file) as f:
         boards = json.load(f)
 
-    all_jobs = []
-    async with GreenhouseConnector() as c:
-        for i, board in enumerate(boards[:max_boards]):
-            token = board["token"]
-            logger.info("=== Greenhouse %d/%d: %s ===", i + 1, min(len(boards), max_boards), token)
-            try:
-                jobs = await c.fetch_jobs(token, f"{token}.com")
-                all_jobs.extend(jobs)
-                logger.info("  %s: %d jobs", token, len(jobs))
-            except Exception as e:
-                logger.warning("  %s: FAILED: %s", token, str(e)[:100])
+    targets = boards[:max_boards]
+    total = len(targets)
+    sem = asyncio.Semaphore(concurrency)
+    all_jobs: list = []
+    done = 0
 
+    # One connector per fetch — the per-domain rate limit is class-level so
+    # we still throttle correctly, but each connector has its own inner
+    # semaphore which means our outer concurrency setting actually takes effect.
+    async def fetch_one(idx_board):
+        nonlocal done
+        i, board = idx_board
+        token = board["token"]
+        async with sem:
+            try:
+                async with GreenhouseConnector() as c:
+                    jobs = await c.fetch_jobs(token, f"{token}.com")
+                done += 1
+                if done % 50 == 0 or done == total:
+                    logger.info("Greenhouse progress: %d/%d boards (last: %s = %d jobs)", done, total, token, len(jobs))
+                return jobs
+            except Exception as e:
+                done += 1
+                logger.warning("  GH %s FAILED: %s", token, str(e)[:100])
+                return []
+
+    results = await asyncio.gather(*(fetch_one((i, b)) for i, b in enumerate(targets)))
+    for r in results:
+        all_jobs.extend(r)
+
+    logger.info("Greenhouse total: %d jobs from %d boards", len(all_jobs), total)
     return all_jobs
 
 
-async def crawl_workday(max_instances: int = 30):
-    """Crawl confirmed Workday instances."""
+async def crawl_workday(max_instances: int = 30, concurrency: int = 10):
+    """Crawl confirmed Workday instances in parallel."""
+    import asyncio
     from src.connectors.workday import WorkdayConnector
 
     results_file = Path("workday_confirmed_results.json")
@@ -101,19 +122,34 @@ async def crawl_workday(max_instances: int = 30):
     with open(results_file) as f:
         instances = json.load(f)
 
-    all_jobs = []
-    async with WorkdayConnector() as c:
-        for i, inst in enumerate(instances[:max_instances]):
-            board_token = inst["board_token"]
-            company = inst["company"]
-            logger.info("=== Workday %d/%d: %s (%d listed) ===", i + 1, min(len(instances), max_instances), company, inst["total_jobs"])
-            try:
-                jobs = await c.fetch_jobs(board_token, f"{company}.com")
-                all_jobs.extend(jobs)
-                logger.info("  %s: %d jobs fetched", company, len(jobs))
-            except Exception as e:
-                logger.warning("  %s: FAILED: %s", company, str(e)[:100])
+    targets = instances[:max_instances]
+    total = len(targets)
+    sem = asyncio.Semaphore(concurrency)
+    all_jobs: list = []
+    done = 0
 
+    async def fetch_one(idx_inst):
+        nonlocal done
+        i, inst = idx_inst
+        board_token = inst["board_token"]
+        company = inst["company"]
+        async with sem:
+            try:
+                async with WorkdayConnector() as c:
+                    jobs = await c.fetch_jobs(board_token, f"{company}.com")
+                done += 1
+                logger.info("Workday %d/%d: %s = %d jobs (listed %d)", done, total, company, len(jobs), inst["total_jobs"])
+                return jobs
+            except Exception as e:
+                done += 1
+                logger.warning("  WD %s FAILED: %s", company, str(e)[:100])
+                return []
+
+    results = await asyncio.gather(*(fetch_one((i, inst)) for i, inst in enumerate(targets)))
+    for r in results:
+        all_jobs.extend(r)
+
+    logger.info("Workday total: %d jobs from %d instances", len(all_jobs), total)
     return all_jobs
 
 
