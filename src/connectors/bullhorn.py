@@ -52,27 +52,43 @@ _CORP_TABLE_PATH = Path(__file__).resolve().parents[2] / "data" / "bullhorn_corp
 
 
 def _load_corp_table() -> dict[str, dict]:
-    """Load (slug -> {corp_id, swimlane, public_url, name}) from the data file.
-    Returns {} if the file doesn't exist (connector falls back to HTML scrape).
+    """Load Bullhorn customer table from data/bullhorn_corps.txt.
+
+    Format: slug,public_corp_token,swimlane,public_url,name,internal_cluster_id
+
+    The PUBLIC_CORP_TOKEN (column 2, e.g. "51ha21") is what works on the
+    public-rest API. The internal_cluster_id is the numeric admin-panel
+    ID — it's stored for reference but cannot be used directly without
+    a Partner BhRestToken.
+
+    Rows missing the public_corp_token are skipped — they need the token
+    obtained from each customer first.
     """
     if not _CORP_TABLE_PATH.exists():
         return {}
     table: dict[str, dict] = {}
+    skipped = 0
     with open(_CORP_TABLE_PATH, "r", encoding="utf-8") as f:
         reader = csv.DictReader(
             (l for l in f if l.strip() and not l.startswith("#")),
-            fieldnames=["slug", "corp_id", "swimlane", "public_url", "name"],
+            fieldnames=["slug", "public_corp_token", "swimlane", "public_url", "name", "internal_cluster_id"],
         )
         for row in reader:
             slug = (row.get("slug") or "").strip().lower()
-            if slug:
-                table[slug] = {
-                    "corp_id": (row.get("corp_id") or "").strip(),
-                    "swimlane": (row.get("swimlane") or "").strip() or None,
-                    "public_url": (row.get("public_url") or "").strip(),
-                    "name": (row.get("name") or "").strip(),
-                }
-    logger.info("Bullhorn corp table: loaded %d entries", len(table))
+            token = (row.get("public_corp_token") or "").strip()
+            if not slug:
+                continue
+            if not token:
+                skipped += 1
+                continue
+            table[slug] = {
+                "corp_id": token,  # what we send to public-rest
+                "swimlane": (row.get("swimlane") or "").strip() or None,
+                "public_url": (row.get("public_url") or "").strip(),
+                "name": (row.get("name") or "").strip(),
+                "internal_cluster_id": (row.get("internal_cluster_id") or "").strip(),
+            }
+    logger.info("Bullhorn corp table: loaded %d entries (%d skipped — missing public_corp_token)", len(table), skipped)
     return table
 
 

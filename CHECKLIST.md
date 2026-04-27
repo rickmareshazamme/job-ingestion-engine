@@ -71,7 +71,11 @@ The 6 new connectors (iCIMS / SuccessFactors / Taleo / Bullhorn / EURES / Bundes
 - [ ] **iCIMS — curated customer subdomain list.** Bare slugs 404. Real customers use vanity URLs (e.g. `careers.somecompany.com` powered by iCIMS, not `careers-{slug}.icims.com`). Need to find ~100 real iCIMS customer career sites and put them in `data/icims_confirmed.txt` (one subdomain per line). Source: https://icims.com/customers, LinkedIn searches, Wappalyzer ATS detector.
 - [ ] **SAP SuccessFactors — curated customer subdomain list.** Same pattern. Put real `{customer}.successfactors.com` subdomains in `data/successfactors_confirmed.txt`.
 - [ ] **Oracle Taleo — curated customer subdomain list.** `data/taleo_confirmed.txt` with `{customer}.taleo.net/{section_id}`.
-- [ ] **Bullhorn partner BhRestToken** — register at https://www.bullhorn.com/partners/. Get a partner token + per-customer corpToken. Set as `BULLHORN_PARTNER_TOKEN` Railway env var.
+- [ ] **Bullhorn — three parallel paths** (28 known corp_ids seeded but useless without one of these)
+  - **Path A (fast):** email each of your 28 known clients asking for their public job-board URL (e.g. `https://careers.acme.com/jobs`). Add the URLs to `data/bullhorn_corps.txt` `public_url` column. Connector will scrape each board's hashed corp token automatically. Yields ~2K–10K jobs in days.
+  - **Path B:** apply for a Bullhorn Partner Token at https://www.bullhorn.com/partners/. Once approved, set `BULLHORN_PARTNER_TOKEN` Railway env var → unlocks all 28 corp_ids + lets us discover more. 4–8 week approval.
+  - **Path C:** apply at https://www.bullhorn.com/marketplace/become-a-partner as **Distribution Partner**. Bullhorn pushes customer jobs to our existing `/api/v1/feed/inbound/bullhorn` endpoint. Customers opt-in via their dashboard. Long-term flywheel — all ~10K Bullhorn customers over time.
+  - Note: bare numeric corp_ids alone return `errors.badCorpToken` from the public-rest API — Bullhorn migrated to hashed tokens in 2025. The 28 IDs are valid internal cluster IDs but require one of the paths above to be usable.
 - [ ] **EURES API OIDC client** — register at https://europa.eu/eures/portal/jv-se/index. Get OIDC client_id + client_secret. Set as `EURES_CLIENT_ID` + `EURES_CLIENT_SECRET` Railway env vars (connector needs a small update to use them).
 - [ ] **Bundesagentur OIDC client** — register at https://jobsuche.api.bund.dev/. Get OIDC client credentials for the `jobboerse-jobsuche` scope. Set as `BUNDESAGENTUR_CLIENT_ID` + `BUNDESAGENTUR_CLIENT_SECRET`.
 
