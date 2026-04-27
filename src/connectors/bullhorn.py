@@ -146,9 +146,10 @@ class BullhornConnector(BaseConnector):
         swimlane: Optional[str] = None
         public_url: Optional[str] = None
 
-        # 1. Fast path: literal "corp_id@swimlane" passed in
-        if "@" in board_token and board_token.split("@", 1)[0].isdigit():
-            corp_id, swimlane = board_token.split("@", 1)
+        # 1. Fast path: literal "corp_token@swimlane" passed in (corp_token may be
+        #    alphanumeric like "51ha21" — only the swimlane must be a number)
+        if "@" in board_token and board_token.rsplit("@", 1)[1].isdigit():
+            corp_id, swimlane = board_token.rsplit("@", 1)
         # 2. Fast path: slug exists in data/bullhorn_corps.txt
         elif board_token.lower() in CORP_TABLE:
             row = CORP_TABLE[board_token.lower()]
