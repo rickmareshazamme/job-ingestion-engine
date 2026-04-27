@@ -53,13 +53,17 @@ from src.connectors.base import RawJob
 
 logger = logging.getLogger("zammejobs.harvest.commoncrawl")
 
-# Web Data Commons schema.org structured data extracts. Their CDN serves
-# .nq.gz N-Quads files filtered by schema.org type.
-WDC_BASE = "https://webdatacommons.org/structureddata"
-DEFAULT_CRAWL = "2024-12"  # Update this monthly
+# Web Data Commons class-specific subsets. These are extracted from the
+# October 2024 Common Crawl (the "2024-12" release). Files are sharded
+# into part_0.gz ... part_13.gz on the Mannheim mirror.
+WDC_DATA_BASE = "https://data.dws.informatik.uni-mannheim.de/structureddata"
+DEFAULT_CRAWL = "2024-12"  # Update when WDC publishes a newer schema.org subset
+DEFAULT_CLASS = "JobPosting"
 
-# Pattern: <subject> <predicate> <object> <graph_url> .
-QUAD_RE = re.compile(r'^<([^>]+)>\s+<([^>]+)>\s+(.+?)\s+<([^>]+)>\s*\.\s*$')
+# Pattern: subject predicate object <graph_url> .
+# Subject can be either <URL> or a blank node like _:nodeXXX (used for sub-records).
+# Object can be a literal "..." (with optional @lang or ^^<datatype>) or <URL> or _:nodeXXX.
+QUAD_RE = re.compile(r'^(\S+)\s+<([^>]+)>\s+(.+?)\s+<([^>]+)>\s*\.\s*$')
 
 # Streaming knobs
 DOWNLOAD_CHUNK = 1 << 20            # 1 MiB HTTP read chunks
@@ -67,17 +71,26 @@ FLUSH_EVERY = 50_000                # safety-valve full flush every N quads
 DOWNLOAD_TIMEOUT_SECS = 60 * 60     # WDC files can be huge; 1h ceiling
 
 
-async def list_wdc_files(crawl_id: str = DEFAULT_CRAWL) -> list[str]:
-    """Get the list of JobPosting NQ files for a given crawl from WDC's file index."""
-    index_url = f"{WDC_BASE}/{crawl_id}/files/"
+async def list_wdc_files(crawl_id: str = DEFAULT_CRAWL, class_name: str = DEFAULT_CLASS) -> list[str]:
+    """List the part_*.gz N-Quads files for a class-specific WDC subset.
+
+    The 2024-12 release publishes ~14 shards per class at:
+      {WDC_DATA_BASE}/{crawl_id}/quads/classspecific/{class_name}/part_N.gz
+    """
+    index_url = f"{WDC_DATA_BASE}/{crawl_id}/quads/classspecific/{class_name}/"
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as s:
         async with s.get(index_url) as r:
             if r.status != 200:
-                logger.error("WDC index unreachable for %s (HTTP %d)", crawl_id, r.status)
+                logger.error("WDC index unreachable: %s (HTTP %d)", index_url, r.status)
                 return []
             html = await r.text()
-    files = re.findall(r'href="(JobPosting[^"]+\.nq\.gz)"', html)
-    return [f"{WDC_BASE}/{crawl_id}/files/{f}" for f in files]
+    files = re.findall(r'href="(part_\d+\.gz)"', html)
+    if not files:
+        logger.warning("No part_*.gz files found at %s", index_url)
+        return []
+    # Numerically sort by part index so smaller files come first
+    files = sorted(files, key=lambda n: int(re.search(r"part_(\d+)", n).group(1)))
+    return [f"{index_url}{f}" for f in files]
 
 
 async def _download_to_tempfile(url: str) -> str:
