@@ -18,12 +18,15 @@ class Settings(BaseSettings):
     max_requests_per_second: float = 2.0
     stale_after_missed_runs: int = 3
 
-    # Aggregator API keys
+    # Aggregator API keys (all optional — connector self-disables if missing)
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""
     usajobs_api_key: str = ""
     usajobs_email: str = ""
     reed_api_key: str = ""
+    jooble_api_key: str = ""
+    rapidapi_key: str = ""
+    careerjet_affid: str = ""
 
     # Indexing
     indexnow_key: str = ""

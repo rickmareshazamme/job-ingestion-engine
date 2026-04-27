@@ -22,6 +22,7 @@ from src.connectors.base import PermanentError, RateLimitError, RawJob
 from src.connectors.adzuna import AdzunaConnector
 from src.connectors.arbeitnow import ArbeitnowConnector
 from src.connectors.ashby import AshbyConnector
+from src.connectors.canada_jobbank import CanadaJobBankConnector
 from src.connectors.careerjet import CareerjetConnector
 from src.connectors.greenhouse import GreenhouseConnector
 from src.connectors.jooble import JoobleConnector
@@ -30,6 +31,7 @@ from src.connectors.personio import PersonioConnector
 from src.connectors.recruitee import RecruiteeConnector
 from src.connectors.reed import ReedConnector
 from src.connectors.remoteok import RemoteOKConnector
+from src.connectors.remotive import RemotiveConnector
 from src.connectors.smartrecruiters import SmartRecruitersConnector
 from src.connectors.themuse import TheMuseConnector
 from src.connectors.usajobs import USAJobsConnector
@@ -65,12 +67,14 @@ CONNECTOR_MAP = {
     # Aggregator APIs (volume — millions of jobs)
     "adzuna_api": AdzunaConnector,
     "remoteok_api": RemoteOKConnector,
+    "remotive_api": RemotiveConnector,
     "arbeitnow_api": ArbeitnowConnector,
     "themuse_api": TheMuseConnector,
     "usajobs_api": USAJobsConnector,
     "reed_api": ReedConnector,
     "jooble_api": JoobleConnector,
     "careerjet_api": CareerjetConnector,
+    "canada_jobbank_xml": CanadaJobBankConnector,
 }
 
 # Circuit breaker: max consecutive failures before pausing a source
@@ -131,10 +135,7 @@ def crawl_source(self, source_config_id: str):
             if not connector_cls:
                 raise ValueError(f"Unknown source type: {config.source_type}")
 
-            board_token = config.config.get("board_token", "")
-            employer_domain = config.config.get("employer_domain", "")
-
-            raw_jobs = _run_async(_fetch_with_connector(connector_cls, board_token, employer_domain))
+            raw_jobs = _run_async(_fetch_with_connector(connector_cls, config.source_type, config.config or {}))
 
             # Normalize and upsert
             jobs_new = 0
@@ -301,10 +302,21 @@ def _is_circuit_open(session, config: SourceConfig) -> bool:
     return False
 
 
-async def _fetch_with_connector(connector_cls, board_token: str, employer_domain: str) -> list[RawJob]:
-    """Async helper to fetch jobs using a connector."""
+async def _fetch_with_connector(connector_cls, source_type: str, config: dict) -> list[RawJob]:
+    """All connectors share the (board_token, employer_domain) signature.
+
+    Per-connector meaning of board_token:
+      - ATS connectors: the board/company slug (e.g. greenhouse 'spotify', workable subdomain).
+      - Adzuna / Careerjet: country code ('us', 'gb', etc).
+      - USAJobs / Reed / Jooble / Remotive: optional keyword/category filter.
+      - CanadaJobBank: language code ('eng' or 'fra').
+      - RemoteOK / Arbeitnow / TheMuse: ignored (single global feed).
+    """
     async with connector_cls() as connector:
-        return await connector.fetch_jobs(board_token, employer_domain)
+        return await connector.fetch_jobs(
+            config.get("board_token", ""),
+            config.get("employer_domain", ""),
+        )
 
 
 @celery_app.task
