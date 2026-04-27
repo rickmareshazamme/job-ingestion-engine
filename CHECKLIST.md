@@ -64,6 +64,17 @@ These are 1–4 week approval processes per platform. Once approved, set `FEED_S
 
 Each platform onboarded = thousands of additional ATS customers' jobs flowing into ZammeJobs automatically.
 
+### Tier-2 ATS / staffing / government API tokens (connectors built, blocked on auth)
+
+The 6 new connectors (iCIMS / SuccessFactors / Taleo / Bullhorn / EURES / Bundesagentur) are code-complete but their public APIs have all moved to OIDC-style auth between when the public docs were written and now. Each is producing 0 jobs until tokens/subdomain lists are obtained. Connectors self-disable cleanly on 401/404 so they don't break crawls.
+
+- [ ] **iCIMS — curated customer subdomain list.** Bare slugs 404. Real customers use vanity URLs (e.g. `careers.somecompany.com` powered by iCIMS, not `careers-{slug}.icims.com`). Need to find ~100 real iCIMS customer career sites and put them in `data/icims_confirmed.txt` (one subdomain per line). Source: https://icims.com/customers, LinkedIn searches, Wappalyzer ATS detector.
+- [ ] **SAP SuccessFactors — curated customer subdomain list.** Same pattern. Put real `{customer}.successfactors.com` subdomains in `data/successfactors_confirmed.txt`.
+- [ ] **Oracle Taleo — curated customer subdomain list.** `data/taleo_confirmed.txt` with `{customer}.taleo.net/{section_id}`.
+- [ ] **Bullhorn partner BhRestToken** — register at https://www.bullhorn.com/partners/. Get a partner token + per-customer corpToken. Set as `BULLHORN_PARTNER_TOKEN` Railway env var.
+- [ ] **EURES API OIDC client** — register at https://europa.eu/eures/portal/jv-se/index. Get OIDC client_id + client_secret. Set as `EURES_CLIENT_ID` + `EURES_CLIENT_SECRET` Railway env vars (connector needs a small update to use them).
+- [ ] **Bundesagentur OIDC client** — register at https://jobsuche.api.bund.dev/. Get OIDC client credentials for the `jobboerse-jobsuche` scope. Set as `BUNDESAGENTUR_CLIENT_ID` + `BUNDESAGENTUR_CLIENT_SECRET`.
+
 ### Optional / nice-to-have
 
 - [ ] **Submit to Google Dataset Search** (auto-discovers from `/data/manifest.json` once Google indexes the site)
@@ -79,8 +90,10 @@ Code/infrastructure only. I'll tick these off as they ship.
 
 ### Active / next-up
 
-- [ ] **Common Crawl first run** — manually fired now (PID 11 on worker). Verify completion + DB count once finished. ~10–20 min.
+- [ ] **Common Crawl first run** — refired after connector deploys killed the previous run. Verify completion + DB count once finished. ~10–20 min.
 - [ ] **Live ticker on homepage** — currently shows "recent jobs" via SQL on every page load; could be cached for 60s to reduce DB load when traffic grows.
+- [ ] **Wire OIDC token-exchange into Bullhorn / EURES / Bundesagentur connectors** once Rick gets credentials (small update — add `_get_oauth_token` method, refresh on 401).
+- [ ] **Build a `data/icims_confirmed.txt` seed** — script that probes the Wappalyzer iCIMS-customer list. Same for SuccessFactors and Taleo. Could automate ~50% of the manual list-curation Rick needs to do.
 
 ### Future / deferred (with reason)
 
