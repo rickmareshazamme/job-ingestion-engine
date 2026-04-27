@@ -118,7 +118,13 @@ async def crawl_workday(max_instances: int = 30):
 
 
 async def normalize_and_count(raw_jobs):
-    """Normalize all jobs and print summary."""
+    """Normalize all jobs, persist to DB via upsert, then print summary."""
+    from datetime import datetime
+    from sqlalchemy import create_engine
+    from sqlalchemy.dialects.postgresql import insert
+    from sqlalchemy.orm import sessionmaker
+    from src.config import settings
+    from src.models import Job
     from src.normalizer.pipeline import normalize_job
 
     normalized = []
@@ -128,6 +134,53 @@ async def normalize_and_count(raw_jobs):
             normalized.append(job)
         except Exception:
             pass
+
+    # Persist to DB via upsert on (source_type, source_id)
+    if normalized:
+        engine = create_engine(settings.database_url_sync)
+        SessionLocal = sessionmaker(bind=engine)
+        new_count = 0
+        with SessionLocal() as session:
+            for job in normalized:
+                try:
+                    stmt = insert(Job).values(
+                        id=job.id, content_hash=job.content_hash,
+                        source_type=job.source_type, source_id=job.source_id,
+                        source_url=job.source_url, ats_platform=job.ats_platform,
+                        title=job.title, description_html=job.description_html,
+                        description_text=job.description_text,
+                        employer_name=job.employer_name, employer_domain=job.employer_domain,
+                        employer_logo_url=job.employer_logo_url,
+                        location_raw=job.location_raw, location_city=job.location_city,
+                        location_state=job.location_state, location_country=job.location_country,
+                        location_lat=job.location_lat, location_lng=job.location_lng,
+                        is_remote=job.is_remote, remote_type=job.remote_type,
+                        salary_min=job.salary_min, salary_max=job.salary_max,
+                        salary_currency=job.salary_currency, salary_period=job.salary_period,
+                        salary_raw=job.salary_raw, employment_type=job.employment_type,
+                        categories=job.categories, seniority=job.seniority,
+                        date_posted=job.date_posted, date_expires=job.date_expires,
+                        date_crawled=job.date_crawled, date_updated=job.date_updated,
+                        status=job.status, raw_data=job.raw_data,
+                    ).on_conflict_do_update(
+                        constraint="uq_source",
+                        set_={
+                            "title": job.title,
+                            "description_html": job.description_html,
+                            "description_text": job.description_text,
+                            "location_raw": job.location_raw,
+                            "salary_raw": job.salary_raw,
+                            "date_updated": datetime.utcnow(),
+                            "status": "active",
+                            "raw_data": job.raw_data,
+                        },
+                    )
+                    session.execute(stmt)
+                    new_count += 1
+                except Exception as e:
+                    logger.warning("Upsert failed: %s", str(e)[:120])
+            session.commit()
+        logger.info("Persisted %d jobs to DB", new_count)
 
     # Summary
     countries = {}
