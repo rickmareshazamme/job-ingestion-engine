@@ -13,7 +13,7 @@ from uuid import UUID
 
 import logging
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from uuid import UUID
 
 import aiohttp
@@ -31,6 +31,32 @@ logger = logging.getLogger("zammejobs.frontend")
 
 router = APIRouter(tags=["Frontend"])
 templates = Jinja2Templates(directory="src/templates")
+
+
+UTM_PARAMS = {
+    "source": "zammejobs",
+    "utm_source": "zammejobs",
+    "utm_medium": "referral",
+}
+
+
+def _append_utm(url: str) -> str:
+    """Append source=zammejobs + utm_source/utm_medium to an outbound apply URL.
+
+    Idempotent: if the URL already has a `source` or `utm_source` param, it
+    is overwritten with our value rather than duplicated.
+    """
+    if not url:
+        return url
+    try:
+        parts = urlparse(url)
+        if not parts.scheme or not parts.netloc:
+            return url
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query.update(UTM_PARAMS)
+        return urlunparse(parts._replace(query=urlencode(query)))
+    except Exception:
+        return url
 
 
 async def _is_url_alive(url: str, timeout: float = 5.0) -> bool:
@@ -588,7 +614,7 @@ async def apply_redirect(
     alive = await _is_url_alive(target) if target else False
 
     if alive:
-        return RedirectResponse(target, status_code=302)
+        return RedirectResponse(_append_utm(target), status_code=302)
 
     # Mark the job expired and redirect to the employer's site instead.
     try:
@@ -601,4 +627,4 @@ async def apply_redirect(
         logger.warning("Failed to mark job %s expired: %s", job_id, e)
 
     fallback = _employer_fallback_url(job, employer)
-    return RedirectResponse(fallback, status_code=302)
+    return RedirectResponse(_append_utm(fallback), status_code=302)
