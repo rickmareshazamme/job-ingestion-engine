@@ -137,7 +137,10 @@ class WorkdayConnector(BaseConnector):
         """Normalize a job listing from the search results."""
         title = job.get("title", "")
         external_path = job.get("externalPath", "")
-        source_url = f"{base_url}/en-US{external_path}" if external_path else ""
+        # Workday public job URLs need the careersection (site) segment:
+        #   {base}/en-US/{site}/job/{location}/{slug}_{job_id}
+        # external_path from the API is just /job/... so we splice {site} in.
+        source_url = f"{base_url}/en-US/{site}{external_path}" if external_path else ""
         posted_on = job.get("postedOn", "")
 
         bullet_fields = job.get("bulletFields", [])
