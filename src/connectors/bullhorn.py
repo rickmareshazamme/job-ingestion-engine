@@ -136,7 +136,7 @@ class BullhornConnector(BaseConnector):
         """board_token can be:
           - a slug listed in data/bullhorn_corps.txt → fast path, skip HTML scrape
           - a bare slug → fall back to scraping {slug}.bullhornstaffing.com/jobs
-          - a literal "corp_id@swimlane" pair → hit REST directly with that tuple
+          - a literal "corp_token@swimlane" pair → hit REST directly with that tuple
         """
         if not board_token:
             logger.warning("Bullhorn: no board_token provided")
@@ -145,17 +145,26 @@ class BullhornConnector(BaseConnector):
         corp_id: Optional[str] = None
         swimlane: Optional[str] = None
         public_url: Optional[str] = None
+        # Reverse lookup: when board_token was passed as "TOKEN@swim", find the
+        # matching row in CORP_TABLE so we can use the human-readable name.
+        table_row: Optional[dict] = None
 
         # 1. Fast path: literal "corp_token@swimlane" passed in (corp_token may be
         #    alphanumeric like "51ha21" — only the swimlane must be a number)
         if "@" in board_token and board_token.rsplit("@", 1)[1].isdigit():
             corp_id, swimlane = board_token.rsplit("@", 1)
+            # Reverse-lookup the table by token so employer_name is human-readable
+            for row in CORP_TABLE.values():
+                if row.get("corp_id", "").lower() == corp_id.lower():
+                    table_row = row
+                    break
         # 2. Fast path: slug exists in data/bullhorn_corps.txt
         elif board_token.lower() in CORP_TABLE:
             row = CORP_TABLE[board_token.lower()]
             corp_id = row.get("corp_id") or None
             swimlane = row.get("swimlane")
             public_url = row.get("public_url") or None
+            table_row = row
         # 3. Slow path: scrape the public board
         else:
             try:
@@ -201,7 +210,7 @@ class BullhornConnector(BaseConnector):
 
             for item in items:
                 try:
-                    all_jobs.append(self._normalize(item, board_token, employer_domain, corp_id))
+                    all_jobs.append(self._normalize(item, board_token, employer_domain, corp_id, table_row))
                 except Exception as e:
                     logger.warning("Bullhorn normalize failed for %s: %s", board_token, str(e)[:120])
 
@@ -254,6 +263,7 @@ class BullhornConnector(BaseConnector):
         board_token: str,
         employer_domain: str,
         corp_id: str,
+        table_row: Optional[dict] = None,
     ) -> RawJob:
         job_id = str(item.get("id", ""))
 
@@ -301,8 +311,13 @@ class BullhornConnector(BaseConnector):
 
         # Employer: a Bullhorn corporate board lists the staffing agency itself
         # as employer. The agency is the recruiter — actual end-client is often
-        # confidential. Use the board_token as employer name.
-        employer_name = board_token.replace("-", " ").title()
+        # confidential. Prefer the human-readable name from the corp table; fall
+        # back to a humanized version of the board_token (cleaned of @swimlane).
+        if table_row and table_row.get("name"):
+            employer_name = table_row["name"]
+        else:
+            clean = board_token.split("@", 1)[0]
+            employer_name = clean.replace("-", " ").title()
 
         return RawJob(
             source_type=self.SOURCE_TYPE,
