@@ -578,3 +578,53 @@ def validate_active_job_urls(sample_size: int = 500):
 
     logger.info("Liveness sweep: %d checked, %d marked expired", len(rows), len(dead_ids))
     return {"checked": len(rows), "expired": len(dead_ids)}
+
+
+@celery_app.task
+def link_employers():
+    """Auto-create Employer rows for any (employer_domain, employer_name) pair
+    seen in jobs but not yet in the employer table, then link Job.employer_id.
+
+    Runs every 30 min via Celery beat. Idempotent. Catches Bullhorn customers,
+    Shazamme tenants, aggregator-discovered companies, etc.
+    """
+    from sqlalchemy import text as sql_text
+    session = _get_sync_session()
+    try:
+        # 1. Auto-create new employer rows for unlinked jobs
+        r1 = session.execute(sql_text("""
+            INSERT INTO employers (id, name, domain, ats_platform, country, created_at, updated_at)
+            SELECT
+              gen_random_uuid(),
+              MAX(j.employer_name),
+              lower(j.employer_domain),
+              MAX(j.ats_platform),
+              MAX(j.location_country),
+              NOW(),
+              NOW()
+            FROM jobs j
+            LEFT JOIN employers e ON lower(e.domain) = lower(j.employer_domain)
+            WHERE j.employer_id IS NULL
+              AND j.employer_domain IS NOT NULL
+              AND j.employer_domain != ''
+              AND e.id IS NULL
+            GROUP BY lower(j.employer_domain)
+            ON CONFLICT (domain) DO NOTHING
+        """))
+        created = r1.rowcount
+
+        # 2. Link unlinked jobs to their employer by domain match
+        r2 = session.execute(sql_text("""
+            UPDATE jobs j
+               SET employer_id = e.id
+              FROM employers e
+             WHERE j.employer_id IS NULL
+               AND lower(j.employer_domain) = lower(e.domain)
+        """))
+        linked = r2.rowcount
+        session.commit()
+
+        logger.info("link_employers: created %d new employers, linked %d jobs", created, linked)
+        return {"employers_created": created, "jobs_linked": linked}
+    finally:
+        session.close()

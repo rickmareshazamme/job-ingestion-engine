@@ -20,6 +20,12 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0),  # top of every hour
         "kwargs": {"sample_size": 500},
     },
+    # Every 30 min: auto-create + link employers from unlinked jobs.
+    # Keeps the /employers directory complete as new jobs come in.
+    "link-employers": {
+        "task": "src.tasks.crawl.link_employers",
+        "schedule": crontab(minute="*/30"),
+    },
     # Weekly Common Crawl JobPosting harvest — Sundays 04:00 UTC.
     # Heavy job: streams multi-GB WDC files, can take 1-3 hours.
     "harvest-common-crawl": {
