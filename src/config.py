@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     jooble_api_key: str = ""
     rapidapi_key: str = ""
     careerjet_affid: str = ""
+    bullhorn_partner_token: str = ""
+    bundesagentur_token: str = "bf3a8b6e-7c8e-4e19-a3a8-1c4c2c4c2c4c"
 
     # Indexing
     indexnow_key: str = ""

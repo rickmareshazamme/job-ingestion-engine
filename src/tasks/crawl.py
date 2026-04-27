@@ -22,9 +22,13 @@ from src.connectors.base import PermanentError, RateLimitError, RawJob
 from src.connectors.adzuna import AdzunaConnector
 from src.connectors.arbeitnow import ArbeitnowConnector
 from src.connectors.ashby import AshbyConnector
+from src.connectors.bullhorn import BullhornConnector
+from src.connectors.bundesagentur import BundesagenturConnector
 from src.connectors.canada_jobbank import CanadaJobBankConnector
 from src.connectors.careerjet import CareerjetConnector
+from src.connectors.eures import EuresConnector
 from src.connectors.greenhouse import GreenhouseConnector
+from src.connectors.icims import iCIMSConnector
 from src.connectors.jooble import JoobleConnector
 from src.connectors.lever import LeverConnector
 from src.connectors.personio import PersonioConnector
@@ -33,6 +37,8 @@ from src.connectors.reed import ReedConnector
 from src.connectors.remoteok import RemoteOKConnector
 from src.connectors.remotive import RemotiveConnector
 from src.connectors.smartrecruiters import SmartRecruitersConnector
+from src.connectors.successfactors import SuccessFactorsConnector
+from src.connectors.taleo import TaleoConnector
 from src.connectors.themuse import TheMuseConnector
 from src.connectors.usajobs import USAJobsConnector
 from src.connectors.workable import WorkableConnector
@@ -64,6 +70,12 @@ CONNECTOR_MAP = {
     "smartrecruiters_sitemap": SmartRecruitersConnector,
     "recruitee_api": RecruiteeConnector,
     "personio_xml": PersonioConnector,
+    # JS-rendered enterprise ATS (hidden API + sitemap + HTML scrape)
+    "icims_portal": iCIMSConnector,
+    "successfactors_sitemap": SuccessFactorsConnector,
+    "taleo_html": TaleoConnector,
+    # Staffing-platform ATS
+    "bullhorn_api": BullhornConnector,
     # Aggregator APIs (volume — millions of jobs)
     "adzuna_api": AdzunaConnector,
     "remoteok_api": RemoteOKConnector,
@@ -75,6 +87,8 @@ CONNECTOR_MAP = {
     "jooble_api": JoobleConnector,
     "careerjet_api": CareerjetConnector,
     "canada_jobbank_xml": CanadaJobBankConnector,
+    "eures_api": EuresConnector,
+    "bundesagentur_api": BundesagenturConnector,
 }
 
 # Circuit breaker: max consecutive failures before pausing a source

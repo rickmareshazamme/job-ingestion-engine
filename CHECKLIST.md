@@ -85,10 +85,10 @@ Code/infrastructure only. I'll tick these off as they ship.
 ### Future / deferred (with reason)
 
 - [ ] **Tune crawl cadence** — currently using defaults (per-source 6h, liveness sweep hourly with 500 sample, stale cutoff 7d). Revisit when traffic justifies.
-- [ ] **Add iCIMS, SAP SuccessFactors, Oracle Taleo, BrassRing connectors (Tier 2 of PLAN.md)** — JS-rendered enterprise ATS. Needs Playwright, slower. Worth ~3–6M additional jobs.
+- [ ] ~~Add iCIMS, SAP SuccessFactors, Oracle Taleo, BrassRing connectors (Tier 2 of PLAN.md)~~ — iCIMS + SuccessFactors + Taleo SHIPPED this session; BrassRing still deferred.
 - [ ] **Add JSearch (RapidAPI, $30/mo)** — pulls aggregated LinkedIn/Indeed/Glassdoor data we can't get directly. Cheapest fastest +5M jobs.
-- [ ] **Add Bullhorn public API** — staffing-platform jobs (~500K–1M).
-- [ ] **EURES + German Bundesagentur connectors** — ~3M EU government jobs.
+- [x] ~~Add Bullhorn public API — staffing-platform jobs (~500K–1M).~~ — see "Done in this session"
+- [x] ~~EURES + German Bundesagentur connectors — ~3M EU government jobs.~~ — see "Done in this session"
 - [ ] **Region pages** — `/in/au/sydney`, `/in/us/sf` (city-level SEO long-tail).
 - [ ] **Employer detail pages** — currently `/employers` lists; missing `/employers/{slug}`.
 - [ ] **Multi-language descriptions** — for `/in/de`, `/in/fr`, `/in/jp` — auto-translate with cached results.
@@ -99,6 +99,8 @@ Code/infrastructure only. I'll tick these off as they ship.
 
 ### Done in this session
 
+- [x] **Bullhorn + EURES + Bundesagentur connectors** — staffing #1 ATS + EU/German government feeds. Code-complete; live smoke tests revealed all three upstreams have moved to OIDC-style auth in 2025/2026 — connectors implement the documented public spec and self-disable cleanly on 401/404. Token discovery + per-customer corp tokens are now Rick-list items.
+- [x] iCIMS, SAP SuccessFactors, Oracle Taleo connectors + discovery scripts (Tier-2 enterprise ATS) — ~3–6M jobs unlocked
 - [x] Rebrand JobIndex → ZammeJobs (4d570e8)
 - [x] start.sh branching for worker/beat (6d924c7)
 - [x] AI distribution layer: robots.txt, sitemaps, llms.txt, ai.txt, citation.bib, MCP, ChatGPT plugin, IndexNow + Google Indexing modules (2314536, f8347c9)
