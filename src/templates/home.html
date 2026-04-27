@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}ZammeJobs — Every Job, Every ATS, AI-Searchable{% endblock %}
-{% block meta_description %}Free global job index. Every corporate career site — Workday, Greenhouse, Lever, Taleo — indexed and searchable by AI.{% endblock %}
+{% block meta_description %}Search {{ "{:,}".format(stats.active_jobs) }} jobs from Workday, Greenhouse, Lever — instantly. No paywalls, no signup. Free global job index, AI-searchable.{% endblock %}
 
 {% block head_extra %}
 <script type="application/ld+json">
@@ -34,7 +34,7 @@
     </div>
 
     <h1>Every job.<br>AI-searchable.</h1>
-    <p>We index corporate career sites that are invisible to AI search — Workday, Greenhouse, Lever, Taleo, and 12 more ATS platforms. Free forever.</p>
+    <p>Search {{ "{:,}".format(stats.active_jobs) }} jobs from Workday, Greenhouse, Lever &mdash; instantly. No paywalls, no signup.</p>
 
     <div class="search-container">
         <form class="search-bar" action="/search" method="get">
@@ -67,6 +67,94 @@
         <div class="stat-item">
             <div class="stat-value">$0</div>
             <div class="stat-label">For Employers</div>
+        </div>
+    </div>
+</section>
+
+{% if recent_jobs %}
+<section class="ticker-section">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2><span class="dot-live"></span> Just posted</h2>
+            <a href="/search" class="link-cta">Browse all <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="ticker-list" id="ticker-list">
+            {% for job in recent_jobs %}
+            <a href="/jobs/{{ job.id }}" class="ticker-item">
+                <div class="ticker-title">{{ job.title }}</div>
+                <div class="ticker-meta">
+                    <span class="ticker-employer">{{ job.employer_name }}</span>
+                    {% if job.location.city or job.location.country %}
+                    <span class="ticker-loc">{{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country or "" }}</span>
+                    {% endif %}
+                    {% if job.is_remote %}<span class="tag remote">Remote</span>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if country_cards %}
+<section class="countries-section">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2>Browse by country</h2>
+            <span class="section-sub">{{ stats.jobs_by_country | length }} countries indexed</span>
+        </div>
+        <div class="country-grid">
+            {% for c in country_cards %}
+            <a href="/in/{{ c.slug }}/" class="country-card">
+                <div class="country-iso">{{ c.iso }}</div>
+                <div class="country-name">{{ c.name }}</div>
+                <div class="country-count">{{ "{:,}".format(c.count) }} jobs</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if top_employers %}
+<section class="employers-section">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2>Top employers hiring now</h2>
+            <a href="/employers" class="link-cta">All employers <span aria-hidden="true">&rarr;</span></a>
+        </div>
+        <div class="emp-row">
+            {% for emp in top_employers %}
+            <a href="/search?employer={{ emp.domain }}" class="emp-tile" title="{{ emp.name }} &mdash; {{ emp.job_count }} active jobs">
+                {% if emp.logo_url %}
+                <img src="{{ emp.logo_url }}" alt="" class="emp-logo" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                <div class="emp-logo emp-logo-fallback" style="display:none">{{ emp.initial }}</div>
+                {% else %}
+                <div class="emp-logo emp-logo-fallback">{{ emp.initial }}</div>
+                {% endif %}
+                <div class="emp-info">
+                    <div class="emp-name">{{ emp.name }}</div>
+                    <div class="emp-jobs">{{ "{:,}".format(emp.job_count) }} jobs</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="ai-section">
+    <div class="section-inner">
+        <div class="ai-card">
+            <div class="ai-badge">For AI assistants</div>
+            <h2>Built for ChatGPT, Claude, Gemini &mdash; and your agents.</h2>
+            <p>ZammeJobs indexes the corporate career sites that LinkedIn and Indeed hide from AI search. We expose the full catalog as <code>llms.txt</code>, OpenAPI, and MCP &mdash; no scraping, no rate limits, no auth.</p>
+            <div class="ai-actions">
+                <a href="/llms.txt" class="btn-pill">/llms.txt</a>
+                <a href="/.well-known/mcp" class="btn-pill">/.well-known/mcp</a>
+                <a href="/openapi.json" class="btn-pill">/openapi.json</a>
+                <a href="/docs" class="btn-pill btn-pill-ghost">API docs</a>
+            </div>
         </div>
     </div>
 </section>

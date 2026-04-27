@@ -1,102 +1,184 @@
 {% extends "base.html" %}
 
 {% block title %}{% if q %}{{ q }} jobs{% else %}Search Jobs{% endif %} — ZammeJobs{% endblock %}
+{% block meta_description %}{{ "{:,}".format(meta.total) }} {% if q %}{{ q }} {% endif %}jobs from corporate career sites. Filter by country, remote, salary, employment type. Free, no signup.{% endblock %}
 
 {% block content %}
-<div class="results-container">
-    <form class="search-bar" action="/search" method="get" style="margin-bottom: 1rem; max-width: 640px;">
+<div class="search-shell">
+    <form class="search-bar search-bar-top" action="/search" method="get">
         <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input type="text" name="q" value="{{ q or '' }}" placeholder="Job title, skill, or company..." aria-label="Search jobs">
+        {% if filters.country %}<input type="hidden" name="country" value="{{ filters.country }}">{% endif %}
+        {% if filters.remote %}<input type="hidden" name="remote" value="true">{% endif %}
+        {% if filters.employment_type %}<input type="hidden" name="employment_type" value="{{ filters.employment_type }}">{% endif %}
+        {% if filters.seniority %}<input type="hidden" name="seniority" value="{{ filters.seniority }}">{% endif %}
+        {% if filters.salary_min %}<input type="hidden" name="salary_min" value="{{ filters.salary_min }}">{% endif %}
+        {% if filters.posted_within %}<input type="hidden" name="posted_within" value="{{ filters.posted_within }}">{% endif %}
         <button type="submit">Search</button>
     </form>
 
-    <div class="filters-bar" style="max-width: none; margin: 0; padding: 0;">
-        <a href="/search?{{ query_string }}&remote=true" class="filter-chip {{ 'active' if filters.remote }}">Remote</a>
+    <div class="search-layout">
+        <aside class="filter-sidebar" aria-label="Filters">
+            <form action="/search" method="get" class="filter-form">
+                {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
 
-        {% for level in ["senior","mid","junior","lead","intern"] %}
-        <a href="/search?{{ query_string }}&seniority={{ level }}" class="filter-chip {{ 'active' if filters.seniority == level }}">{{ level | capitalize }}</a>
-        {% endfor %}
-
-        <select class="filter-select" onchange="if(this.value) window.location='/search?{{ query_string }}&country='+this.value">
-            <option value="">Country</option>
-            {% for code in ["US","GB","AU","DE","CA","FR","NL","IE","SG","IN","BR","JP"] %}
-            <option value="{{ code }}" {{ "selected" if filters.country == code }}>{{ code }}</option>
-            {% endfor %}
-        </select>
-
-        <select class="filter-select" onchange="if(this.value) window.location='/search?{{ query_string }}&employment_type='+this.value">
-            <option value="">Type</option>
-            {% for etype in ["FULL_TIME","PART_TIME","CONTRACTOR","TEMPORARY","INTERN"] %}
-            <option value="{{ etype }}" {{ "selected" if filters.employment_type == etype }}>{{ etype | replace("_", " ") }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="results-header" style="margin-top: 1.5rem;">
-        <span class="results-count">{{ "{:,}".format(meta.total) }} jobs{% if q %} matching "{{ q }}"{% endif %}</span>
-    </div>
-
-    <div class="job-list">
-        {% for job in jobs %}
-        <a href="/jobs/{{ job.id }}" class="job-card">
-            <div class="job-card-top">
-                <div>
-                    <h3>{{ job.title }}</h3>
-                    <span class="employer">{{ job.employer_name }}</span>
+                <div class="filter-group">
+                    <h4>Country</h4>
+                    <select name="country" class="filter-input">
+                        <option value="">Any country</option>
+                        {% for code, label in [("US","United States"),("GB","United Kingdom"),("AU","Australia"),("CA","Canada"),("DE","Germany"),("FR","France"),("NL","Netherlands"),("IE","Ireland"),("IN","India"),("SG","Singapore"),("BR","Brazil"),("JP","Japan"),("ES","Spain"),("IT","Italy")] %}
+                        <option value="{{ code }}" {{ "selected" if filters.country == code }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                {% if job.salary.min %}
-                <span class="job-salary-badge">
-                    {{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %}-{{ "{:,}".format(job.salary.max) }}{% endif %}
-                </span>
-                {% endif %}
-            </div>
-            <div class="job-meta">
-                {% if job.location.city or job.location.country %}
-                <span class="tag">{{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}</span>
-                {% endif %}
-                {% if job.is_remote %}
-                <span class="tag remote">{{ job.remote_type | capitalize }}</span>
-                {% endif %}
-                {% if job.employment_type %}
-                <span class="tag">{{ job.employment_type | replace("_", " ") }}</span>
-                {% endif %}
-                {% if job.seniority %}
-                <span class="tag">{{ job.seniority | capitalize }}</span>
-                {% endif %}
-                {% for cat in job.categories[:2] %}
-                <span class="tag">{{ cat }}</span>
-                {% endfor %}
-                {% if job.ats_platform %}
-                <span class="tag">{{ job.ats_platform }}</span>
-                {% endif %}
-            </div>
-        </a>
-        {% else %}
-        <div style="text-align:center; color: var(--color-text-muted); padding: 4rem 1rem;">
-            <p style="font-size: var(--text-lg); margin-bottom: 0.5rem;">No jobs found</p>
-            <p>Try a different search or remove filters.</p>
-        </div>
-        {% endfor %}
-    </div>
 
-    {% if meta.total_pages > 1 %}
-    <div class="pagination">
-        {% if meta.page > 1 %}
-        <a href="/search?{{ query_string }}&page={{ meta.page - 1 }}">Prev</a>
-        {% endif %}
-        {% for p in range(1, meta.total_pages + 1) %}
-            {% if p == meta.page %}
-            <span class="current">{{ p }}</span>
-            {% elif p <= 3 or p > meta.total_pages - 2 or (p >= meta.page - 1 and p <= meta.page + 1) %}
-            <a href="/search?{{ query_string }}&page={{ p }}">{{ p }}</a>
-            {% elif p == 4 or p == meta.total_pages - 2 %}
-            <span style="color: var(--color-text-muted);">...</span>
+                <div class="filter-group">
+                    <h4>Remote</h4>
+                    <label class="filter-toggle">
+                        <input type="checkbox" name="remote" value="true" {{ "checked" if filters.remote }}>
+                        <span>Remote-only</span>
+                    </label>
+                </div>
+
+                <div class="filter-group">
+                    <h4>Employment type</h4>
+                    <select name="employment_type" class="filter-input">
+                        <option value="">Any type</option>
+                        {% for etype, label in [("FULL_TIME","Full-time"),("PART_TIME","Part-time"),("CONTRACTOR","Contract"),("TEMPORARY","Temporary"),("INTERN","Internship")] %}
+                        <option value="{{ etype }}" {{ "selected" if filters.employment_type == etype }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <h4>Seniority</h4>
+                    <select name="seniority" class="filter-input">
+                        <option value="">Any level</option>
+                        {% for lvl, label in [("intern","Intern"),("junior","Junior"),("mid","Mid-level"),("senior","Senior"),("lead","Lead"),("principal","Principal"),("director","Director"),("executive","Executive")] %}
+                        <option value="{{ lvl }}" {{ "selected" if filters.seniority == lvl }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <h4>Salary (min)</h4>
+                    <select name="salary_min" class="filter-input">
+                        <option value="">Any salary</option>
+                        {% for v, label in [("50000","$50k+"),("80000","$80k+"),("100000","$100k+"),("120000","$120k+"),("150000","$150k+"),("200000","$200k+")] %}
+                        <option value="{{ v }}" {{ "selected" if filters.salary_min and filters.salary_min|string == v }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <h4>Posted</h4>
+                    <div class="filter-radios">
+                        {% for v, label in [("","Any time"),("1d","Last 24h"),("7d","Last week"),("30d","Last month")] %}
+                        <label class="filter-radio">
+                            <input type="radio" name="posted_within" value="{{ v }}" {{ "checked" if (filters.posted_within or '') == v }}>
+                            <span>{{ label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button type="submit" class="filter-apply">Apply filters</button>
+                {% if filters.country or filters.remote or filters.employment_type or filters.seniority or filters.salary_min or filters.posted_within %}
+                <a href="/search{% if q %}?q={{ q }}{% endif %}" class="filter-clear">Clear all</a>
+                {% endif %}
+            </form>
+        </aside>
+
+        <main class="results-main">
+            <div class="results-header">
+                <span class="results-count"><strong>{{ "{:,}".format(meta.total) }}</strong> jobs{% if q %} matching &ldquo;{{ q }}&rdquo;{% endif %}</span>
+                {% if meta.total > 0 %}
+                <span class="results-sub">Page {{ meta.page }} of {{ meta.total_pages }}</span>
+                {% endif %}
+            </div>
+
+            <div class="job-list">
+                {% for job in jobs %}
+                <a href="/jobs/{{ job.id }}" class="job-card">
+                    <div class="job-card-top">
+                        <div class="job-card-titles">
+                            <h3>{{ job.title }}</h3>
+                            <span class="employer">{{ job.employer_name }}</span>
+                        </div>
+                        {% if job.salary.min %}
+                        <span class="job-salary-badge">
+                            {{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %}-{{ "{:,}".format(job.salary.max) }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="job-meta">
+                        {% if job.location.city or job.location.country %}
+                        <span class="tag">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:2px"><path d="M12 22s8-7 8-13a8 8 0 1 0-16 0c0 6 8 13 8 13z"/><circle cx="12" cy="9" r="3"/></svg>
+                            {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country or "" }}
+                        </span>
+                        {% endif %}
+                        {% if job.is_remote %}
+                        <span class="tag remote">Remote{% if job.remote_type and job.remote_type != "remote" %} &middot; {{ job.remote_type | capitalize }}{% endif %}</span>
+                        {% endif %}
+                        {% if job.employment_type %}
+                        <span class="tag">{{ job.employment_type | replace("_", " ") | lower | capitalize }}</span>
+                        {% endif %}
+                        {% if job.seniority %}
+                        <span class="tag">{{ job.seniority | capitalize }}</span>
+                        {% endif %}
+                        {% for cat in job.categories[:2] %}
+                        <span class="tag">{{ cat }}</span>
+                        {% endfor %}
+                        {% if job.date_posted %}
+                        <span class="tag tag-quiet">{{ job.date_posted.strftime('%b %d') }}</span>
+                        {% endif %}
+                        {% if job.ats_platform %}
+                        <span class="tag tag-ats">{{ job.ats_platform | capitalize }}</span>
+                        {% endif %}
+                    </div>
+                </a>
+                {% else %}
+                <div class="empty-state">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <p class="empty-title">No jobs found{% if q %} for &ldquo;{{ q }}&rdquo;{% endif %}</p>
+                    {% if suggestions %}
+                    <p class="empty-sub">Did you mean...</p>
+                    <div class="empty-suggestions">
+                        {% for s in suggestions %}
+                        <a href="/jobs/{{ s.id }}" class="empty-sug">
+                            <span>{{ s.title }}</span>
+                            <span class="empty-sug-emp">at {{ s.employer_name }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="empty-sub">Try a broader query, remove filters, or <a href="/search">browse all jobs</a>.</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if meta.total_pages > 1 %}
+            <div class="pagination">
+                {% if meta.page > 1 %}
+                <a href="/search?{{ query_string }}&page={{ meta.page - 1 }}" rel="prev">&larr; Prev</a>
+                {% endif %}
+                {% for p in range(1, meta.total_pages + 1) %}
+                    {% if p == meta.page %}
+                    <span class="current">{{ p }}</span>
+                    {% elif p <= 2 or p > meta.total_pages - 2 or (p >= meta.page - 1 and p <= meta.page + 1) %}
+                    <a href="/search?{{ query_string }}&page={{ p }}">{{ p }}</a>
+                    {% elif p == 3 or p == meta.total_pages - 2 %}
+                    <span class="ellipsis">...</span>
+                    {% endif %}
+                {% endfor %}
+                {% if meta.page < meta.total_pages %}
+                <a href="/search?{{ query_string }}&page={{ meta.page + 1 }}" rel="next">Next &rarr;</a>
+                {% endif %}
+            </div>
             {% endif %}
-        {% endfor %}
-        {% if meta.page < meta.total_pages %}
-        <a href="/search?{{ query_string }}&page={{ meta.page + 1 }}">Next</a>
-        {% endif %}
+        </main>
     </div>
-    {% endif %}
 </div>
 {% endblock %}

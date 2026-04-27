@@ -75,8 +75,13 @@ def _build_json_ld(job: Job) -> str:
         "@context": "https://schema.org",
         "@type": "JobPosting",
         "title": job.title,
-        "description": job.description_text or job.description_html or "",
+        "description": job.description_html or job.description_text or "",
         "datePosted": str(job.date_posted)[:10] if job.date_posted else "",
+        "identifier": {
+            "@type": "PropertyValue",
+            "name": job.employer_name,
+            "value": str(job.id),
+        },
         "hiringOrganization": {
             "@type": "Organization",
             "name": job.employer_name,
@@ -92,6 +97,7 @@ def _build_json_ld(job: Job) -> str:
             },
         },
         "employmentType": job.employment_type or "FULL_TIME",
+        "directApply": True,
     }
 
     if job.source_url:
@@ -101,7 +107,7 @@ def _build_json_ld(job: Job) -> str:
         schema["validThrough"] = str(job.date_expires)[:10]
 
     if job.salary_min or job.salary_max:
-        value = {"@type": "QuantitativeValue", "unitText": job.salary_period or "YEAR"}
+        value = {"@type": "QuantitativeValue", "unitText": (job.salary_period or "YEAR").upper()}
         if job.salary_min:
             value["minValue"] = job.salary_min
         if job.salary_max:
@@ -122,6 +128,19 @@ def _build_json_ld(job: Job) -> str:
 
     if job.employer_logo_url:
         schema["hiringOrganization"]["logo"] = job.employer_logo_url
+
+    if job.categories:
+        schema["industry"] = job.categories[0]
+        schema["occupationalCategory"] = ", ".join(job.categories[:3])
+
+    if job.seniority:
+        schema["experienceRequirements"] = {
+            "@type": "OccupationalExperienceRequirements",
+            "monthsOfExperience": {
+                "intern": 0, "junior": 0, "mid": 24, "senior": 60,
+                "lead": 84, "principal": 96, "director": 120, "executive": 144,
+            }.get(job.seniority.lower() if job.seniority else "", 0),
+        }
 
     return json.dumps(schema, indent=2, ensure_ascii=False)
 
@@ -159,6 +178,23 @@ def _job_to_template_obj(job: Job) -> dict:
     }
 
 
+_COUNTRY_NAMES = {
+    "US": "United States", "GB": "United Kingdom", "AU": "Australia",
+    "CA": "Canada", "DE": "Germany", "FR": "France", "NL": "Netherlands",
+    "IE": "Ireland", "IN": "India", "SG": "Singapore", "BR": "Brazil",
+    "JP": "Japan", "ES": "Spain", "IT": "Italy", "MX": "Mexico",
+    "NZ": "New Zealand", "PL": "Poland", "ZA": "South Africa",
+    "TW": "Taiwan", "HK": "Hong Kong", "IL": "Israel", "CN": "China",
+}
+
+_ISO_TO_PATH = {
+    "US": "us", "GB": "gb", "AU": "au", "CA": "ca", "DE": "de", "FR": "fr",
+    "NL": "nl", "IE": "ie", "IN": "in", "SG": "sg", "BR": "br", "JP": "jp",
+    "ES": "es", "IT": "it", "MX": "mx", "NZ": "nz", "PL": "pl", "ZA": "za",
+    "TW": "tw", "HK": "hk", "IL": "il", "CN": "cn",
+}
+
+
 @router.get("/", response_class=HTMLResponse)
 async def homepage(request: Request, session: AsyncSession = Depends(get_session)):
     # Fetch stats
@@ -182,15 +218,69 @@ async def homepage(request: Request, session: AsyncSession = Depends(get_session
         .order_by(func.count(Job.id).desc())
     )
 
+    # Recent jobs for ticker (5 most recent)
+    recent_result = await session.execute(
+        select(Job).where(Job.status == "active")
+        .order_by(Job.date_posted.desc().nullslast())
+        .limit(5)
+    )
+    recent_jobs = [_job_to_template_obj(j) for j in recent_result.scalars().all()]
+
+    # Top employers by active job count
+    job_count_subq = (
+        select(Job.employer_id, func.count(Job.id).label("job_count"))
+        .where(Job.status == "active")
+        .group_by(Job.employer_id)
+        .subquery()
+    )
+    top_emp_result = await session.execute(
+        select(Employer, func.coalesce(job_count_subq.c.job_count, 0).label("job_count"))
+        .join(job_count_subq, Employer.id == job_count_subq.c.employer_id)
+        .order_by(job_count_subq.c.job_count.desc())
+        .limit(12)
+    )
+    top_employers = [
+        {
+            "id": str(row[0].id),
+            "name": row[0].name,
+            "domain": row[0].domain,
+            "logo_url": row[0].logo_url,
+            "ats_platform": row[0].ats_platform,
+            "job_count": row[1],
+            "initial": (row[0].name[:1] or "?").upper(),
+        }
+        for row in top_emp_result.all()
+    ]
+
+    jobs_by_country = {r[0]: r[1] for r in country_result.all() if r[0]}
+
+    # Build top-8 country cards with names + path slugs
+    country_cards = []
+    for iso, count in list(jobs_by_country.items())[:8]:
+        slug = _ISO_TO_PATH.get(iso)
+        if not slug:
+            continue
+        country_cards.append({
+            "iso": iso,
+            "slug": slug,
+            "name": _COUNTRY_NAMES.get(iso, iso),
+            "count": count,
+        })
+
     stats = {
         "total_jobs": total_result.scalar() or 0,
         "active_jobs": active_result.scalar() or 0,
         "total_employers": employer_result.scalar() or 0,
-        "jobs_by_country": {r[0]: r[1] for r in country_result.all() if r[0]},
+        "jobs_by_country": jobs_by_country,
         "jobs_by_ats": {r[0]: r[1] for r in ats_result.all() if r[0]},
     }
 
-    return templates.TemplateResponse(request, "home.html", {"stats": stats})
+    return templates.TemplateResponse(request, "home.html", {
+        "stats": stats,
+        "recent_jobs": recent_jobs,
+        "top_employers": top_employers,
+        "country_cards": country_cards,
+    })
 
 
 @router.get("/search", response_class=HTMLResponse)
@@ -204,11 +294,15 @@ async def search_page(
     seniority: Optional[str] = None,
     employer: Optional[str] = None,
     salary_min: Optional[int] = None,
+    salary_max: Optional[int] = None,
+    posted_within: Optional[str] = None,  # "1d", "7d", "30d"
     sort: str = "date",
     page: int = Query(1, ge=1),
     per_page: int = 20,
     session: AsyncSession = Depends(get_session),
 ):
+    from datetime import timedelta
+
     stmt = select(Job).where(Job.status == "active")
     count_stmt = select(func.count()).select_from(Job).where(Job.status == "active")
 
@@ -239,6 +333,17 @@ async def search_page(
     if salary_min:
         stmt = stmt.where(Job.salary_max >= salary_min)
         count_stmt = count_stmt.where(Job.salary_max >= salary_min)
+    if salary_max:
+        stmt = stmt.where(Job.salary_min <= salary_max)
+        count_stmt = count_stmt.where(Job.salary_min <= salary_max)
+
+    if posted_within:
+        days_map = {"1d": 1, "7d": 7, "30d": 30}
+        days = days_map.get(posted_within)
+        if days:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            stmt = stmt.where(Job.date_posted >= cutoff)
+            count_stmt = count_stmt.where(Job.date_posted >= cutoff)
 
     if sort == "salary_desc":
         stmt = stmt.order_by(Job.salary_max.desc().nullslast())
@@ -259,10 +364,32 @@ async def search_page(
 
     filters = {
         "country": country,
+        "city": city,
         "remote": remote,
         "employment_type": employment_type,
         "seniority": seniority,
+        "salary_min": salary_min,
+        "salary_max": salary_max,
+        "posted_within": posted_within,
     }
+
+    # Empty-state suggestions: top employers / categories when no results
+    suggestions = []
+    if total == 0 and q:
+        # Find similar titles by trigram-ish ilike on word fragments
+        words = [w for w in q.split() if len(w) >= 4]
+        if words:
+            sug_kw = or_(*[Job.title.ilike(f"%{w}%") for w in words])
+            sug_result = await session.execute(
+                select(Job.title, Job.id, Job.employer_name)
+                .where(Job.status == "active")
+                .where(sug_kw)
+                .limit(5)
+            )
+            suggestions = [
+                {"title": r[0], "id": str(r[1]), "employer_name": r[2]}
+                for r in sug_result.all()
+            ]
 
     return templates.TemplateResponse(request, "search.html", {
         "jobs": jobs,
@@ -270,6 +397,7 @@ async def search_page(
         "filters": filters,
         "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
         "query_string": query_string,
+        "suggestions": suggestions,
     })
 
 
@@ -293,9 +421,87 @@ async def job_detail_page(
     job_obj = _job_to_template_obj(job)
     json_ld = _build_json_ld(job)
 
+    # Similar jobs — same employer first; if not enough, top up with same primary category
+    similar_stmt = (
+        select(Job)
+        .where(Job.status == "active")
+        .where(Job.id != job.id)
+        .where(Job.employer_id == job.employer_id)
+        .order_by(Job.date_posted.desc().nullslast())
+        .limit(5)
+    )
+    similar_rows = (await session.execute(similar_stmt)).scalars().all()
+    if len(similar_rows) < 5 and job.categories:
+        primary_cat = job.categories[0]
+        topup_stmt = (
+            select(Job)
+            .where(Job.status == "active")
+            .where(Job.id != job.id)
+            .where(Job.categories.any(primary_cat))
+            .order_by(Job.date_posted.desc().nullslast())
+            .limit(5 - len(similar_rows))
+        )
+        topup_rows = (await session.execute(topup_stmt)).scalars().all()
+        existing_ids = {r.id for r in similar_rows}
+        for r in topup_rows:
+            if r.id not in existing_ids:
+                similar_rows.append(r)
+                if len(similar_rows) >= 5:
+                    break
+    similar_jobs = [_job_to_template_obj(r) for r in similar_rows[:5]]
+
+    # Employer panel
+    employer_panel = None
+    if job.employer_id:
+        emp_result = await session.execute(select(Employer).where(Employer.id == job.employer_id))
+        emp = emp_result.scalar_one_or_none()
+        if emp:
+            emp_jobs = (await session.execute(
+                select(func.count()).select_from(Job)
+                .where(Job.status == "active")
+                .where(Job.employer_id == emp.id)
+            )).scalar() or 0
+            employer_panel = {
+                "id": str(emp.id),
+                "name": emp.name,
+                "domain": emp.domain,
+                "logo_url": emp.logo_url,
+                "ats_platform": emp.ats_platform,
+                "career_page_url": emp.career_page_url,
+                "country": emp.country,
+                "job_count": emp_jobs,
+                "initial": (emp.name[:1] or "?").upper(),
+            }
+
     return templates.TemplateResponse(request, "job_detail.html", {
         "job": job_obj,
         "json_ld": json_ld,
+        "similar_jobs": similar_jobs,
+        "employer_panel": employer_panel,
+    })
+
+
+@router.get("/for-ai", response_class=HTMLResponse)
+async def for_ai_page(request: Request, session: AsyncSession = Depends(get_session)):
+    """Integration paths for AI assistants (ChatGPT, Claude, MCP) and AI labs."""
+    active_result = await session.execute(
+        select(func.count()).select_from(Job).where(Job.status == "active")
+    )
+    employer_result = await session.execute(select(func.count()).select_from(Employer))
+    countries_result = await session.execute(
+        select(func.count(func.distinct(Job.location_country)))
+        .where(Job.status == "active")
+        .where(Job.location_country.is_not(None))
+    )
+    stats = {
+        "active_jobs": active_result.scalar() or 0,
+        "total_employers": employer_result.scalar() or 0,
+        "countries": countries_result.scalar() or 0,
+    }
+    base = str(request.base_url).rstrip("/")
+    return templates.TemplateResponse(request, "for_ai.html", {
+        "stats": stats,
+        "base": base,
     })
 
 

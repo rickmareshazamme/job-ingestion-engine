@@ -81,8 +81,59 @@ async def country_home(
     )).scalar() or 0
 
     by_ats = (await session.execute(
-        select(Job.ats_platform, func.count()).where(Job.status == "active").where(Job.location_country == iso).group_by(Job.ats_platform)
+        select(Job.ats_platform, func.count()).where(Job.status == "active").where(Job.location_country == iso).group_by(Job.ats_platform).order_by(func.count().desc())
     )).all()
+
+    # Recent jobs in country (5)
+    recent_result = await session.execute(
+        select(Job).where(Job.status == "active").where(Job.location_country == iso)
+        .order_by(Job.date_posted.desc().nullslast())
+        .limit(5)
+    )
+    recent_jobs = [_job_to_template_obj(j) for j in recent_result.scalars().all()]
+
+    # Top cities
+    cities_result = await session.execute(
+        select(Job.location_city, func.count(Job.id))
+        .where(Job.status == "active")
+        .where(Job.location_country == iso)
+        .where(Job.location_city != None)  # noqa
+        .where(Job.location_city != "")
+        .group_by(Job.location_city)
+        .order_by(func.count(Job.id).desc())
+        .limit(8)
+    )
+    top_cities = [
+        {"name": r[0], "count": r[1]}
+        for r in cities_result.all() if r[0]
+    ]
+
+    # Top employers in country
+    job_count_subq = (
+        select(Job.employer_id, func.count(Job.id).label("job_count"))
+        .where(Job.status == "active")
+        .where(Job.location_country == iso)
+        .group_by(Job.employer_id)
+        .subquery()
+    )
+    top_emp_result = await session.execute(
+        select(Employer, func.coalesce(job_count_subq.c.job_count, 0).label("job_count"))
+        .join(job_count_subq, Employer.id == job_count_subq.c.employer_id)
+        .order_by(job_count_subq.c.job_count.desc())
+        .limit(10)
+    )
+    top_employers = [
+        {
+            "id": str(row[0].id),
+            "name": row[0].name,
+            "domain": row[0].domain,
+            "logo_url": row[0].logo_url,
+            "ats_platform": row[0].ats_platform,
+            "job_count": row[1],
+            "initial": (row[0].name[:1] or "?").upper(),
+        }
+        for row in top_emp_result.all()
+    ]
 
     return templates.TemplateResponse(request, "country_home.html", {
         "country_code": country.lower(),
@@ -92,6 +143,9 @@ async def country_home(
         "country_lang": meta["lang"],
         "total_jobs": total,
         "jobs_by_ats": dict(by_ats) if by_ats else {},
+        "recent_jobs": recent_jobs,
+        "top_cities": top_cities,
+        "top_employers": top_employers,
     })
 
 
