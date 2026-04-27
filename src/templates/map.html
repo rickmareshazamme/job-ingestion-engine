@@ -87,7 +87,7 @@
     if (country) params.set('country', country);
     if (remote) params.set('remote', 'true');
     document.getElementById('map-stats').textContent = 'Loading…';
-    const r = await fetch('/api/v1/jobs/map?' + params.toString());
+    const r = await fetch('/api/v1/map?' + params.toString());
     const data = await r.json();
     cluster.clearLayers();
     for (const c of data.clusters) {

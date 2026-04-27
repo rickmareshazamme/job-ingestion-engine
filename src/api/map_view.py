@@ -28,7 +28,7 @@ def _round(v: float) -> float:
     return round(v * 10) / 10
 
 
-@router.get("/api/v1/jobs/map", summary="Job clusters by location for map rendering")
+@router.get("/api/v1/map", summary="Job clusters by location for map rendering")
 async def jobs_map(
     request: Request,
     country: Optional[str] = Query(None, description="ISO alpha-2 country filter, e.g. US, GB, AU"),
