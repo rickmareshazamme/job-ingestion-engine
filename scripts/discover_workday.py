@@ -106,7 +106,7 @@ async def discover(slugs: list[str], concurrency: int = 5) -> list[dict]:
     valid = []
 
     async with aiohttp.ClientSession(
-        headers={"User-Agent": "JobIndexBot/1.0 (+https://jobindex.ai/bot)"},
+        headers={"User-Agent": "ZammeJobsBot/1.0 (+https://zammejobs.com/bot)"},
     ) as session:
         tasks = [probe_workday(session, slug, semaphore) for slug in slugs]
         results = await asyncio.gather(*tasks)

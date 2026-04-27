@@ -89,7 +89,7 @@ async def discover(tokens: list[str], concurrency: int = 10) -> list[dict]:
 
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=10),
-        headers={"User-Agent": "JobIndexBot/1.0 (+https://jobindex.ai/bot)"},
+        headers={"User-Agent": "ZammeJobsBot/1.0 (+https://zammejobs.com/bot)"},
     ) as session:
 
         async def check(token):

@@ -52,8 +52,8 @@ Jobs are ingested from:
 
 ## Contact
 
-- Website: https://jobindex.ai
-- API docs: https://jobindex.ai/docs
+- Website: https://zammejobs.com
+- API docs: https://zammejobs.com/docs
 """
 
 LLM_INFO = {

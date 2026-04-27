@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ job.title }} at {{ job.employer_name }} — JobIndex{% endblock %}
+{% block title %}{{ job.title }} at {{ job.employer_name }} — ZammeJobs{% endblock %}
 {% block meta_description %}{{ job.title }} at {{ job.employer_name }}. {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}. {% if job.salary.min %}{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}-{{ "{:,}".format(job.salary.max) }}{% endif %}. {% endif %}Apply now.{% endblock %}
 
 {% block head_extra %}

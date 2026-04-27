@@ -68,7 +68,7 @@ async def discover(entries: list[tuple[str, str, str]], concurrency: int = 10) -
     valid = []
 
     async with aiohttp.ClientSession(
-        headers={"User-Agent": "JobIndexBot/1.0 (+https://jobindex.ai/bot)"},
+        headers={"User-Agent": "ZammeJobsBot/1.0 (+https://zammejobs.com/bot)"},
     ) as session:
         tasks = [validate_instance(session, slug, inst, site, semaphore) for slug, inst, site in entries]
         results = await asyncio.gather(*tasks)

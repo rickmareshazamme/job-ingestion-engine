@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql://jobindex:jobindex@localhost:5432/jobindex"
     redis_url: str = "redis://localhost:6379/0"
     opencage_api_key: str = ""
-    bot_user_agent: str = "JobIndexBot/1.0 (+https://jobindex.ai/bot)"
+    bot_user_agent: str = "ZammeJobsBot/1.0 (+https://zammejobs.com/bot)"
 
     # Crawl settings
     default_crawl_interval_hours: int = 6
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Indexing
     indexnow_key: str = ""
-    site_domain: str = "jobindex.ai"
+    site_domain: str = "zammejobs.com"
     google_sa_file: str = ""
 
     # Logging
