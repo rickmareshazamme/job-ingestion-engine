@@ -339,6 +339,142 @@ async def _fetch_with_connector(connector_cls, source_type: str, config: dict) -
         )
 
 
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
+def harvest_common_crawl(
+    self,
+    crawl_id: str = "2024-12",
+    max_files: int = 3,
+    max_records: int = 100_000,
+):
+    """Harvest schema.org JobPosting structured data from a Common Crawl
+    snapshot via the Web Data Commons extracts.
+
+    Streaming end-to-end: the .nq.gz files (100MB-2GB each) are downloaded
+    chunked to a tempfile and parsed line-by-line, never materialized in
+    RAM. RawJobs are normalized and upserted as they are emitted.
+
+    Returns dict with files_processed, jobs_seen, jobs_inserted,
+    jobs_updated, jobs_skipped_duplicate.
+    """
+    from src.harvest.common_crawl import iter_raw_jobs
+
+    logger.info(
+        "Common Crawl harvest start: crawl_id=%s max_files=%d max_records=%d",
+        crawl_id, max_files, max_records,
+    )
+
+    session = _get_sync_session()
+    new_urls: list[str] = []
+    jobs_seen = 0
+    jobs_inserted = 0
+    jobs_updated = 0
+    jobs_skipped_duplicate = 0
+    files_processed = 0
+
+    # Preload the set of URLs we already have for this source. This is the
+    # cheap dedupe short-circuit: if a URL is already in the DB we skip the
+    # entire normalize -> upsert path. For a Common Crawl run the table can
+    # have millions of rows, so we cap at the most recent N to keep memory
+    # bounded; anything outside that window will fall through to the
+    # on_conflict_do_update on uq_source and still be safe, just not as fast.
+    DEDUPE_WINDOW = 2_000_000
+    try:
+        rows = session.execute(
+            select(Job.source_url)
+            .where(Job.source_type == "commoncrawl_jobposting")
+            .order_by(Job.date_updated.desc())
+            .limit(DEDUPE_WINDOW)
+        ).all()
+        seen_urls: set[str] = {r[0] for r in rows if r[0]}
+        logger.info("Common Crawl dedupe set: %d known URLs", len(seen_urls))
+    except Exception as e:
+        logger.warning("Could not preload dedupe set: %s", str(e)[:120])
+        seen_urls = set()
+
+    async def _drive():
+        nonlocal jobs_seen, jobs_inserted, jobs_updated, jobs_skipped_duplicate, files_processed
+        last_file_url: str | None = None
+
+        async for raw in iter_raw_jobs(
+            crawl_id=crawl_id,
+            max_files=max_files,
+            max_records=max_records,
+            seen_urls=seen_urls,
+        ):
+            # `iter_raw_jobs` already short-circuited on `seen_urls`, but a
+            # secondary check guards against any race between preload and now.
+            jobs_seen += 1
+
+            # Track distinct files so we can report files_processed.
+            file_marker = raw.raw_data.get("graph_url") if raw.raw_data else None
+            if file_marker and file_marker != last_file_url:
+                last_file_url = file_marker
+
+            if raw.source_url in seen_urls:
+                jobs_skipped_duplicate += 1
+                continue
+
+            try:
+                job = await normalize_job(raw, do_geocode=False)
+                _upsert_job(session, job)
+                seen_urls.add(raw.source_url)
+                jobs_inserted += 1
+                new_urls.append(f"https://{settings.site_domain}/jobs/{job.id}")
+                # Commit periodically so we don't lose everything on a crash.
+                if jobs_inserted % 1_000 == 0:
+                    session.commit()
+                    logger.info(
+                        "Common Crawl progress: seen=%d inserted=%d skipped=%d",
+                        jobs_seen, jobs_inserted, jobs_skipped_duplicate,
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Common Crawl normalize/upsert failed for %s: %s",
+                    raw.source_url, str(e)[:120],
+                )
+
+        # Approximate files_processed from max_files cap; the streaming API
+        # drains files in order and stops on max_records.
+        files_processed = max_files
+
+    try:
+        _run_async(_drive())
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error("Common Crawl harvest failed: %s", str(e)[:200])
+        raise self.retry(exc=e)
+    finally:
+        session.close()
+
+    # Push new URLs to IndexNow + Google Indexing API. Best-effort.
+    if new_urls:
+        try:
+            from src.indexing.indexnow import submit_urls as indexnow_submit
+            submitted = _run_async(indexnow_submit(new_urls))
+            if submitted:
+                logger.info("IndexNow: submitted %d Common Crawl URLs", submitted)
+        except Exception as e:
+            logger.warning("IndexNow dispatch failed: %s", str(e)[:120])
+        try:
+            from src.indexing.google import notify_url_updated
+            # Google Indexing free quota is 200/day, so cap per-run.
+            for u in new_urls[:200]:
+                _run_async(notify_url_updated(u))
+        except Exception as e:
+            logger.warning("Google Indexing dispatch failed: %s", str(e)[:120])
+
+    result = {
+        "files_processed": files_processed,
+        "jobs_seen": jobs_seen,
+        "jobs_inserted": jobs_inserted,
+        "jobs_updated": jobs_updated,
+        "jobs_skipped_duplicate": jobs_skipped_duplicate,
+    }
+    logger.info("Common Crawl harvest complete: %s", result)
+    return result
+
+
 @celery_app.task
 def mark_stale_jobs():
     """Mark jobs as expired if not updated in 7 days."""

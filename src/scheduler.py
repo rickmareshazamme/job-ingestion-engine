@@ -20,6 +20,17 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute=0),  # top of every hour
         "kwargs": {"sample_size": 500},
     },
+    # Weekly Common Crawl JobPosting harvest — Sundays 04:00 UTC.
+    # Heavy job: streams multi-GB WDC files, can take 1-3 hours.
+    "harvest-common-crawl": {
+        "task": "src.tasks.crawl.harvest_common_crawl",
+        "schedule": crontab(hour=4, minute=0, day_of_week=0),
+        "kwargs": {
+            "crawl_id": "2024-12",
+            "max_files": 3,
+            "max_records": 100_000,
+        },
+    },
 }
 
 
