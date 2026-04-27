@@ -36,6 +36,7 @@ from src.connectors.recruitee import RecruiteeConnector
 from src.connectors.reed import ReedConnector
 from src.connectors.remoteok import RemoteOKConnector
 from src.connectors.remotive import RemotiveConnector
+from src.connectors.shazamme import ShazammeConnector
 from src.connectors.smartrecruiters import SmartRecruitersConnector
 from src.connectors.successfactors import SuccessFactorsConnector
 from src.connectors.taleo import TaleoConnector
@@ -89,6 +90,8 @@ CONNECTOR_MAP = {
     "canada_jobbank_xml": CanadaJobBankConnector,
     "eures_api": EuresConnector,
     "bundesagentur_api": BundesagenturConnector,
+    # Shazamme — first-party feed of all tenant jobs
+    "shazamme_feed": ShazammeConnector,
 }
 
 # Circuit breaker: max consecutive failures before pausing a source
