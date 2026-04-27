@@ -361,3 +361,67 @@ def mark_stale_jobs():
         return {"jobs_expired": expired_count}
     finally:
         session.close()
+
+
+@celery_app.task
+def validate_active_job_urls(sample_size: int = 500):
+    """HEAD-check a random sample of active jobs. Mark any that 404/410 as expired.
+
+    Catches jobs filled between full crawls without waiting 7 days for
+    mark_stale_jobs to expire them.
+    """
+    import asyncio
+    import aiohttp
+    from sqlalchemy import select
+    from sqlalchemy.sql.expression import func as sql_func
+
+    session = _get_sync_session()
+    try:
+        rows = session.execute(
+            select(Job.id, Job.source_url)
+            .where(Job.status == "active")
+            .where(Job.source_url.isnot(None))
+            .order_by(sql_func.random())
+            .limit(sample_size)
+        ).all()
+    finally:
+        session.close()
+
+    if not rows:
+        return {"checked": 0, "expired": 0}
+
+    async def head(session_h, job_id, url):
+        try:
+            async with session_h.head(url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status in (404, 410, 451):
+                    return ("dead", job_id)
+                if r.status in (405, 501):
+                    async with session_h.get(url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=8)) as g:
+                        return ("dead" if g.status in (404, 410, 451) else "ok", job_id)
+                return ("ok", job_id)
+        except Exception:
+            return ("error", job_id)
+
+    async def run():
+        sem = asyncio.Semaphore(20)
+        async with aiohttp.ClientSession(headers={"User-Agent": settings.bot_user_agent}) as s:
+            async def bounded(jid, u):
+                async with sem:
+                    return await head(s, jid, u)
+            return await asyncio.gather(*(bounded(jid, u) for jid, u in rows))
+
+    results = _run_async(run())
+    dead_ids = [r[1] for r in results if r[0] == "dead"]
+
+    if dead_ids:
+        session = _get_sync_session()
+        try:
+            session.execute(
+                update(Job).where(Job.id.in_(dead_ids)).values(status="expired", date_updated=datetime.utcnow())
+            )
+            session.commit()
+        finally:
+            session.close()
+
+    logger.info("Liveness sweep: %d checked, %d marked expired", len(rows), len(dead_ids))
+    return {"checked": len(rows), "expired": len(dead_ids)}

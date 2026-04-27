@@ -13,6 +13,13 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.crawl.mark_stale_jobs",
         "schedule": crontab(hour=3, minute=0),
     },
+    # Hourly liveness sweep — HEAD-check ~500 random "active" jobs and mark
+    # any that 404/410 as expired. Catches jobs filled between full crawls.
+    "validate-active-jobs": {
+        "task": "src.tasks.crawl.validate_active_job_urls",
+        "schedule": crontab(minute=0),  # top of every hour
+        "kwargs": {"sample_size": 500},
+    },
 }
 
 

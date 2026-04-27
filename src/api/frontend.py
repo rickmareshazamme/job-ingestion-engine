@@ -11,18 +11,62 @@ import math
 from typing import Optional
 from uuid import UUID
 
+import logging
+from datetime import datetime
+from urllib.parse import urlparse
+from uuid import UUID
+
+import aiohttp
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.schemas import JobLocation, JobSalary, JobSummary
 from src.db import get_session
 from src.models import Employer, Job
 
+logger = logging.getLogger("zammejobs.frontend")
+
 router = APIRouter(tags=["Frontend"])
 templates = Jinja2Templates(directory="src/templates")
+
+
+async def _is_url_alive(url: str, timeout: float = 5.0) -> bool:
+    """HEAD-request the URL with a short timeout. Returns True if 2xx/3xx."""
+    if not url:
+        return False
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as s:
+            async with s.head(url, allow_redirects=True) as resp:
+                if resp.status < 400:
+                    return True
+                # Some sites reject HEAD; fall back to a tiny GET
+                if resp.status in (405, 501):
+                    async with s.get(url, allow_redirects=True) as gresp:
+                        return gresp.status < 400
+                return False
+    except Exception:
+        return False
+
+
+def _employer_fallback_url(job: Job, employer: Employer | None) -> str:
+    """Where to send a user when the job's apply URL is dead."""
+    if employer and employer.career_page_url:
+        return employer.career_page_url
+    if employer and employer.domain:
+        return f"https://{employer.domain}"
+    if job.employer_domain:
+        # Strip pseudo-domain suffixes our connectors generate when employer domain is unknown
+        d = job.employer_domain
+        for suffix in (".adzuna-source.invalid", ".remoteok-source.invalid", ".remotive-source.invalid",
+                       ".jooble-source.invalid", ".themuse-source.invalid", ".reed-source.invalid",
+                       ".arbeitnow-source.invalid"):
+            if d.endswith(suffix):
+                return "/"
+        return f"https://{d}"
+    return "/"
 
 
 def _build_json_ld(job: Job) -> str:
@@ -310,3 +354,45 @@ async def employers_page(
         "q": q,
         "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
     })
+
+
+@router.get("/apply/{job_id}")
+async def apply_redirect(
+    job_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """Live-check the job's apply URL. If it 404s or times out, mark expired
+    and redirect the user to the employer's career page (or homepage)."""
+    try:
+        uid = UUID(job_id)
+    except ValueError:
+        return RedirectResponse("/", status_code=302)
+
+    result = await session.execute(select(Job).where(Job.id == uid))
+    job = result.scalar_one_or_none()
+    if not job:
+        return RedirectResponse("/", status_code=302)
+
+    employer = None
+    if job.employer_id:
+        emp_result = await session.execute(select(Employer).where(Employer.id == job.employer_id))
+        employer = emp_result.scalar_one_or_none()
+
+    target = job.source_url
+    alive = await _is_url_alive(target) if target else False
+
+    if alive:
+        return RedirectResponse(target, status_code=302)
+
+    # Mark the job expired and redirect to the employer's site instead.
+    try:
+        await session.execute(
+            update(Job).where(Job.id == uid).values(status="expired", date_updated=datetime.utcnow())
+        )
+        await session.commit()
+        logger.info("Job %s marked expired (apply URL dead): %s", job_id, target)
+    except Exception as e:
+        logger.warning("Failed to mark job %s expired: %s", job_id, e)
+
+    fallback = _employer_fallback_url(job, employer)
+    return RedirectResponse(fallback, status_code=302)

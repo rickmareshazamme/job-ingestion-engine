@@ -83,7 +83,7 @@
     </div>
 
     {% if job.source_url %}
-    <a href="{{ job.source_url }}" target="_blank" rel="noopener" class="apply-button">
+    <a href="/apply/{{ job.id }}" target="_blank" rel="noopener" class="apply-button">
         Apply on {{ job.ats_platform | capitalize if job.ats_platform else "employer site" }}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
     </a>
