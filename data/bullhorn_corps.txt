@@ -1,55 +1,51 @@
 # Bullhorn customer table.
-# Format: slug,public_corp_token,swimlane,public_url,name,internal_cluster_id
+# Format: slug,public_corp_token,swimlane,public_url,name,internal_cluster_id,apply_url_pattern
 #
-# IMPORTANT: the field that works on the public-rest API is the HASHED
-# `public_corp_token` (a short string like "51ha21"), NOT the numeric
-# clusterId you see in the Bullhorn admin panel.
+# IMPORTANT FIELDS:
+#   public_corp_token   — hashed string (e.g. "51ha21") — works on public-rest API
+#   internal_cluster_id — numeric admin-panel ID — useless without partner BhRestToken
+#   apply_url_pattern   — per-tenant template with {id} placeholder
+#                         e.g. "https://aequor.com/jobs/{id}"
+#                         Each Bullhorn customer hosts their own job pages on
+#                         their own domain. The pattern is per-customer.
 #
-# Both fields are issued by Bullhorn per customer:
-#   - public_corp_token  → use on public-rest{N}.bullhornstaffing.com (no auth)
-#   - internal_cluster_id → use only with a Partner BhRestToken (private API)
-#
-# Confirmed working swimlanes for a given customer typically include
-# 30,31,32,33,40,41,42,43,44,70,71. Connector probes them in order.
-#
-# Once you have a customer's public corp token, paste it as column 2.
-# Leave column 6 blank if you don't know the cluster id.
+# Confirmed working swimlanes typically include 30,31,32,33,40,41,42,43,44,70,71.
+# When apply_url_pattern is blank, connector falls back to "<source_url unknown>".
 
 # === Confirmed working ===
-aequor-healthcare,51ha21,40,,Aequor Healthcare,17459
+aequor-healthcare,51ha21,40,,Aequor Healthcare,17459,https://aequor.com/jobs/{id}
 
-# === 27 internal cluster IDs Rick supplied — need their hashed corp tokens to actually crawl ===
-# To get the hashed token: ask each client for their public job-board URL (e.g.
-# "where do candidates see your open roles?"), then we scrape the token from
-# the page bootstrap. Or ask Bullhorn support for the "PL token" or
-# "private label token" for each clusterId.
+# === 27 internal cluster IDs Rick supplied — need hashed corp tokens AND apply URL patterns ===
+# Tokens come from Bullhorn support ("PL token" per clusterId).
+# URL patterns: ask each client "where do candidates see your open jobs?" and
+# inspect one job to find the pattern (usually their domain + /jobs/{id}).
 #
-# slug,?,?,?,name,clusterId
-achieve-group-australia,,,,Achieve Group Australia Pty Ltd,9062
-asiapac-demo,,,,AsiaPac Demo,17011
-bradshaw-consulting,,,,Bradshaw Consulting Pty Ltd,2876
-claremont-consulting,,,,Claremont Consulting,512
-claremont-consulting-ltd,,,,Claremont Consulting Ltd,2349
-deploy-uk-ltd,,,,Deploy UK Ltd,2464
-derwent-executive,,,,Derwent Executive,11629
-dewinter,,,,DeWinter,1533
-elastic-ltd,,,,Elastic Ltd,28764
-harrison-mcmillan,,,,Harrison McMillan,6637
-hunt-talent-partners,,,,Hunt Talent Partners,28044
-integrity-staffing-solutions,,,,Integrity Staffing Solutions,5171
-kinbridge-partners,,,,Kinbridge Partners,28944
-mayday-recruitment,,,,MAYDAY Recruitment,26098
-mayday-recruitment-pty-internal,,,,MAYDAY Recruitment Pty Ltd Internal HR 2nd Instance,28702
-objective-paradigm,,,,Objective Paradigm,932
-pelham-berkeley-search,,,,Pelham Berkeley Search,18015
-perks-people-solutions,,,,Perks People Solutions,21537
-philippines-recruitment-company,,,,Philippines Recruitment Company Pty Ltd,24192
-procureone-limited,,,,ProcureOne Limited,18870
-pursue-talent-limited,,,,Pursue Talent Limited,23919
-qps-employment-group,,,,QPS Employment Group BH1,23377
-queen-consulting-group,,,,Queen Consulting Group Inc,9489
-redpath-partners,,,,Redpath Partners,28766
-standard7-pty-ltd,,,,Standard7 Pty Ltd,24573
-the-lucas-group,,,,The Lucas Group,24273
-yoh-rpo,,,,Yoh RPO,20404
-yoh-solutions-uk-dz,,,,Yoh Solutions UK - D&Z,16211
+# slug,token,swim,public_url,name,clusterId,apply_url_pattern
+achieve-group-australia,,,,Achieve Group Australia Pty Ltd,9062,
+asiapac-demo,,,,AsiaPac Demo,17011,
+bradshaw-consulting,,,,Bradshaw Consulting Pty Ltd,2876,
+claremont-consulting,,,,Claremont Consulting,512,
+claremont-consulting-ltd,,,,Claremont Consulting Ltd,2349,
+deploy-uk-ltd,,,,Deploy UK Ltd,2464,
+derwent-executive,,,,Derwent Executive,11629,
+dewinter,,,,DeWinter,1533,
+elastic-ltd,,,,Elastic Ltd,28764,
+harrison-mcmillan,,,,Harrison McMillan,6637,
+hunt-talent-partners,,,,Hunt Talent Partners,28044,
+integrity-staffing-solutions,,,,Integrity Staffing Solutions,5171,
+kinbridge-partners,,,,Kinbridge Partners,28944,
+mayday-recruitment,,,,MAYDAY Recruitment,26098,
+mayday-recruitment-pty-internal,,,,MAYDAY Recruitment Pty Ltd Internal HR 2nd Instance,28702,
+objective-paradigm,,,,Objective Paradigm,932,
+pelham-berkeley-search,,,,Pelham Berkeley Search,18015,
+perks-people-solutions,,,,Perks People Solutions,21537,
+philippines-recruitment-company,,,,Philippines Recruitment Company Pty Ltd,24192,
+procureone-limited,,,,ProcureOne Limited,18870,
+pursue-talent-limited,,,,Pursue Talent Limited,23919,
+qps-employment-group,,,,QPS Employment Group BH1,23377,
+queen-consulting-group,,,,Queen Consulting Group Inc,9489,
+redpath-partners,,,,Redpath Partners,28766,
+standard7-pty-ltd,,,,Standard7 Pty Ltd,24573,
+the-lucas-group,,,,The Lucas Group,24273,
+yoh-rpo,,,,Yoh RPO,20404,
+yoh-solutions-uk-dz,,,,Yoh Solutions UK - D&Z,16211,

@@ -71,7 +71,7 @@ def _load_corp_table() -> dict[str, dict]:
     with open(_CORP_TABLE_PATH, "r", encoding="utf-8") as f:
         reader = csv.DictReader(
             (l for l in f if l.strip() and not l.startswith("#")),
-            fieldnames=["slug", "public_corp_token", "swimlane", "public_url", "name", "internal_cluster_id"],
+            fieldnames=["slug", "public_corp_token", "swimlane", "public_url", "name", "internal_cluster_id", "apply_url_pattern"],
         )
         for row in reader:
             slug = (row.get("slug") or "").strip().lower()
@@ -87,6 +87,7 @@ def _load_corp_table() -> dict[str, dict]:
                 "public_url": (row.get("public_url") or "").strip(),
                 "name": (row.get("name") or "").strip(),
                 "internal_cluster_id": (row.get("internal_cluster_id") or "").strip(),
+                "apply_url_pattern": (row.get("apply_url_pattern") or "").strip(),
             }
     logger.info("Bullhorn corp table: loaded %d entries (%d skipped — missing public_corp_token)", len(table), skipped)
     return table
@@ -300,8 +301,13 @@ class BullhornConnector(BaseConnector):
 
         emp_type = item.get("employmentType") or ""
 
-        # Source URL: the public-facing job detail page on the company board
-        source_url = f"https://{board_token}.bullhornstaffing.com/jobs/{job_id}"
+        # Source URL: each Bullhorn customer hosts job pages on their own
+        # domain. Use the per-tenant apply_url_pattern from data/bullhorn_corps.txt
+        # if available; fall back to a Bullhorn-hosted board path otherwise.
+        if table_row and table_row.get("apply_url_pattern"):
+            source_url = table_row["apply_url_pattern"].replace("{id}", job_id)
+        else:
+            source_url = f"https://app.bullhornstaffing.com/jobboard/{corp_id}/{job_id}"
 
         is_remote = None
         loc_lower = location_raw.lower()
