@@ -1237,7 +1237,7 @@ a.emp-stat-link:hover { background: var(--color-bg-hover); color: var(--color-ac
 :root[data-theme="light"] .logo-mark { fill: #ffffff; }
 .logo-zamme { color: var(--color-text); }
 :root[data-theme="light"] .logo-zamme { color: #EC008C; }
-.logo-jobs { color: var(--color-text); margin-left: 1px; }
+.logo-jobs { color: var(--color-text); }
 :root[data-theme="light"] .logo-jobs { color: #22B14C; }
 
 /* ─── Theme toggle ───────────────────────────────────── */
