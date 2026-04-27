@@ -27,6 +27,12 @@ Usage:
 
     # Limit enum range for testing
     python3 -m scripts.discover_bullhorn --enumerate --enum-start 1 --enum-end 500
+
+    # Fill missing swimlanes for rows already in data/bullhorn_corps.txt
+    python3 -m scripts.discover_bullhorn --probe-swimlanes
+
+    # Crawl every known corp in the table and persist jobs to DB
+    python3 -m scripts.discover_bullhorn --crawl-known
 """
 
 from __future__ import annotations
@@ -197,6 +203,125 @@ async def run_enum(session: aiohttp.ClientSession, start: int, end: int) -> list
     return found
 
 
+async def probe_swimlane_for_corp(session: aiohttp.ClientSession, corp_id: str) -> str | None:
+    """For a known corp_id with unknown swimlane, probe each shard until one returns 200."""
+    for swim in SWIMLANES:
+        url = (
+            f"https://public-rest{swim}.bullhornstaffing.com/rest-services/{corp_id}/"
+            f"query/JobBoardPost?fields=id&where=isPublic%3D1&count=1&start=0"
+        )
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status == 200:
+                    body = await r.json(content_type=None)
+                    if isinstance(body, dict) and "data" in body:
+                        return str(swim)
+        except (aiohttp.ClientError, TimeoutError, ValueError):
+            continue
+    return None
+
+
+async def run_probe_swimlanes(session: aiohttp.ClientSession, rows: dict[str, dict]) -> int:
+    """Fill in missing swimlanes for rows in the table. Mutates rows dict."""
+    todo = [(cid, r) for cid, r in rows.items() if not r.get("swimlane")]
+    if not todo:
+        logger.info("All rows already have swimlane — nothing to probe.")
+        return 0
+    logger.info("Probing swimlanes for %d rows", len(todo))
+    sem = asyncio.Semaphore(20)
+
+    async def one(cid, r):
+        async with sem:
+            sw = await probe_swimlane_for_corp(session, cid)
+            if sw:
+                r["swimlane"] = sw
+                logger.info("  %s (%s) → swimlane %s", r.get("name") or r.get("slug"), cid, sw)
+            else:
+                logger.warning("  %s (%s) → no swimlane responded (corp may be inactive)", r.get("name") or r.get("slug"), cid)
+
+    await asyncio.gather(*(one(cid, r) for cid, r in todo))
+    filled = sum(1 for cid, r in todo if r.get("swimlane"))
+    return filled
+
+
+async def run_crawl_known(rows: dict[str, dict]) -> dict:
+    """Iterate every row, fetch jobs via BullhornConnector, upsert into DB."""
+    from datetime import datetime as _dt
+    from sqlalchemy import create_engine
+    from sqlalchemy.dialects.postgresql import insert
+    from sqlalchemy.orm import sessionmaker
+    from src.config import settings
+    from src.connectors.bullhorn import BullhornConnector
+    from src.models import Job
+    from src.normalizer.pipeline import normalize_job
+
+    engine = create_engine(settings.database_url_sync)
+    Session = sessionmaker(bind=engine)
+
+    new = upd = errs = 0
+    sem = asyncio.Semaphore(10)
+    new_urls: list[str] = []
+
+    async def one(corp_id, r):
+        nonlocal new, upd, errs
+        slug = r.get("slug") or f"corp-{corp_id}"
+        sw = r.get("swimlane") or ""
+        token = f"{corp_id}@{sw}" if sw else slug
+        async with sem:
+            try:
+                async with BullhornConnector() as c:
+                    jobs = await c.fetch_jobs(token, "")
+            except Exception as e:
+                logger.warning("Crawl failed for %s (%s): %s", slug, corp_id, str(e)[:120])
+                return
+            for raw in jobs:
+                try:
+                    j = await normalize_job(raw, do_geocode=False)
+                except Exception:
+                    errs += 1
+                    continue
+                with Session() as s:
+                    try:
+                        stmt = insert(Job).values(
+                            id=j.id, content_hash=j.content_hash,
+                            source_type=j.source_type, source_id=j.source_id,
+                            source_url=j.source_url, ats_platform=j.ats_platform,
+                            title=j.title, description_html=j.description_html,
+                            description_text=j.description_text,
+                            employer_name=j.employer_name, employer_domain=j.employer_domain,
+                            employer_logo_url=j.employer_logo_url,
+                            location_raw=j.location_raw, location_city=j.location_city,
+                            location_state=j.location_state, location_country=j.location_country,
+                            is_remote=j.is_remote, remote_type=j.remote_type,
+                            salary_min=j.salary_min, salary_max=j.salary_max,
+                            salary_currency=j.salary_currency, salary_period=j.salary_period,
+                            salary_raw=j.salary_raw, employment_type=j.employment_type,
+                            categories=j.categories, seniority=j.seniority,
+                            date_posted=j.date_posted, date_expires=j.date_expires,
+                            date_crawled=j.date_crawled, date_updated=j.date_updated,
+                            status=j.status, raw_data=j.raw_data,
+                        ).on_conflict_do_update(
+                            constraint="uq_source",
+                            set_={"title": j.title, "description_html": j.description_html,
+                                  "salary_raw": j.salary_raw, "date_updated": _dt.utcnow(),
+                                  "status": "active", "raw_data": j.raw_data},
+                        )
+                        result = s.execute(stmt)
+                        if result.inserted_primary_key:
+                            new += 1
+                            new_urls.append(f"https://{settings.site_domain}/jobs/{j.id}")
+                        else:
+                            upd += 1
+                        s.commit()
+                    except Exception:
+                        errs += 1
+            logger.info("  %s (%s): fetched %d", slug, corp_id, len(jobs))
+
+    logger.info("Crawling %d known Bullhorn corps", len(rows))
+    await asyncio.gather(*(one(cid, r) for cid, r in rows.items()))
+    return {"new": new, "updated": upd, "errors": errs, "new_urls": len(new_urls)}
+
+
 async def main():
     p = argparse.ArgumentParser()
     p.add_argument("--slugs", action="store_true", help="Probe seed slug list")
@@ -204,10 +329,12 @@ async def main():
     p.add_argument("--enum-start", type=int, default=1)
     p.add_argument("--enum-end", type=int, default=10000)
     p.add_argument("--slug-list", type=str, help="Optional path to extra slug list (one per line)")
+    p.add_argument("--probe-swimlanes", action="store_true", help="Fill in missing swimlane for known rows")
+    p.add_argument("--crawl-known", action="store_true", help="Crawl every row in the table and persist jobs")
     args = p.parse_args()
 
-    if not args.slugs and not args.enumerate:
-        p.error("Pass --slugs and/or --enumerate")
+    if not any([args.slugs, args.enumerate, args.probe_swimlanes, args.crawl_known]):
+        p.error("Pass at least one of: --slugs, --enumerate, --probe-swimlanes, --crawl-known")
 
     rows = _read_existing()
     logger.info("Starting with %d existing rows", len(rows))
@@ -228,10 +355,18 @@ async def main():
         if args.enumerate:
             new = await run_enum(session, args.enum_start, args.enum_end)
             for r in new:
-                # Don't overwrite slug-discovered rows (they have nicer names)
                 if r["corp_id"] not in rows:
                     rows[r["corp_id"]] = r
             _write(rows)
+
+        if args.probe_swimlanes:
+            filled = await run_probe_swimlanes(session, rows)
+            _write(rows)
+            logger.info("Filled %d swimlanes", filled)
+
+    if args.crawl_known:
+        result = await run_crawl_known(rows)
+        logger.info("Crawl result: %s", result)
 
     logger.info("Done. Total rows: %d", len(rows))
 

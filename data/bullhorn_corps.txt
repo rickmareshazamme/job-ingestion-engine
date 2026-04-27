@@ -5,10 +5,37 @@
 # Used by src/connectors/bullhorn.py to skip the public-board HTML scrape
 # and hit public-rest{swimlane}.bullhornstaffing.com directly.
 #
-# Strategies for filling this table:
-#   1. python3 -m scripts.discover_bullhorn --slugs                 (~5 min, ~50-100 confirmed)
-#   2. python3 -m scripts.discover_bullhorn --enumerate              (~2h, ~6000-8000 confirmed)
-#   3. Hand-add rows from a partner-supplied list (one per line)
-#   4. Run career-site-grader against staffing-agency domain lists, then add the Bullhorn ones
+# When swimlane is blank, the connector probes all known swimlanes on
+# first fetch and persists the answer (run scripts/discover_bullhorn.py
+# --probe-swimlanes after seeding to pre-fill).
 #
-# Add your 100 known clients below this line as you confirm them.
+# 28 known clients seeded by Rick 2026-04-27. Run --enumerate to find the rest.
+
+achieve-group-australia,9062,,,Achieve Group Australia Pty Ltd
+aequor-healthcare,17459,,,Aequor Healthcare
+asiapac-demo,17011,,,AsiaPac Demo
+bradshaw-consulting,2876,,,Bradshaw Consulting Pty Ltd
+claremont-consulting,512,,,Claremont Consulting
+claremont-consulting-ltd,2349,,,Claremont Consulting Ltd
+deploy-uk-ltd,2464,,,Deploy UK Ltd
+derwent-executive,11629,,,Derwent Executive
+dewinter,1533,,,DeWinter
+elastic-ltd,28764,,,Elastic Ltd
+harrison-mcmillan,6637,,,Harrison McMillan
+hunt-talent-partners,28044,,,Hunt Talent Partners
+integrity-staffing-solutions,5171,,,Integrity Staffing Solutions
+kinbridge-partners,28944,,,Kinbridge Partners
+mayday-recruitment,26098,,,MAYDAY Recruitment
+mayday-recruitment-pty-internal,28702,,,MAYDAY Recruitment Pty Ltd Internal HR 2nd Instance
+objective-paradigm,932,,,Objective Paradigm
+pelham-berkeley-search,18015,,,Pelham Berkeley Search
+perks-people-solutions,21537,,,Perks People Solutions
+philippines-recruitment-company,24192,,,Philippines Recruitment Company Pty Ltd
+procureone-limited,18870,,,ProcureOne Limited
+pursue-talent-limited,23919,,,Pursue Talent Limited
+qps-employment-group,23377,,,QPS Employment Group BH1
+queen-consulting-group,9489,,,Queen Consulting Group Inc
+standard7-pty-ltd,24573,,,Standard7 Pty Ltd
+the-lucas-group,24273,,,The Lucas Group
+yoh-rpo,20404,,,Yoh RPO
+yoh-solutions-uk-dz,16211,,,Yoh Solutions UK - D&Z
