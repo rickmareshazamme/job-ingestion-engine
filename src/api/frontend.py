@@ -319,8 +319,8 @@ async def search_page(
     employment_type: Optional[str] = None,
     seniority: Optional[str] = None,
     employer: Optional[str] = None,
-    salary_min: Optional[int] = None,
-    salary_max: Optional[int] = None,
+    salary_min: Optional[str] = None,  # accept str so empty form value doesn't 422; coerce to int below
+    salary_max: Optional[str] = None,
     posted_within: Optional[str] = None,  # "1d", "7d", "30d"
     sort: str = "date",
     page: int = Query(1, ge=1),
@@ -356,12 +356,20 @@ async def search_page(
         emp_f = or_(Job.employer_domain.ilike(f"%{employer}%"), Job.employer_name.ilike(f"%{employer}%"))
         stmt = stmt.where(emp_f)
         count_stmt = count_stmt.where(emp_f)
-    if salary_min:
-        stmt = stmt.where(Job.salary_max >= salary_min)
-        count_stmt = count_stmt.where(Job.salary_max >= salary_min)
-    if salary_max:
-        stmt = stmt.where(Job.salary_min <= salary_max)
-        count_stmt = count_stmt.where(Job.salary_min <= salary_max)
+    # Coerce salary string params to int, ignoring blanks / non-numeric
+    def _to_int(s):
+        try:
+            return int(s) if s and str(s).strip() else None
+        except (TypeError, ValueError):
+            return None
+    salary_min_n = _to_int(salary_min)
+    salary_max_n = _to_int(salary_max)
+    if salary_min_n:
+        stmt = stmt.where(Job.salary_max >= salary_min_n)
+        count_stmt = count_stmt.where(Job.salary_max >= salary_min_n)
+    if salary_max_n:
+        stmt = stmt.where(Job.salary_min <= salary_max_n)
+        count_stmt = count_stmt.where(Job.salary_min <= salary_max_n)
 
     if posted_within:
         days_map = {"1d": 1, "7d": 7, "30d": 30}
@@ -584,6 +592,79 @@ async def employers_page(
     return templates.TemplateResponse(request, "employers.html", {
         "employers": employers,
         "q": q,
+        "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
+    })
+
+
+@router.get("/employers/{employer_id}", response_class=HTMLResponse)
+async def employer_detail(
+    request: Request,
+    employer_id: str,
+    page: int = Query(1, ge=1),
+    per_page: int = 20,
+    session: AsyncSession = Depends(get_session),
+):
+    """Single-employer page: company info + their active job listings."""
+    try:
+        uid = UUID(employer_id)
+    except ValueError:
+        return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
+
+    emp_result = await session.execute(select(Employer).where(Employer.id == uid))
+    employer = emp_result.scalar_one_or_none()
+    if not employer:
+        return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
+
+    # Active jobs at this employer
+    count_stmt = (
+        select(func.count())
+        .select_from(Job)
+        .where(Job.status == "active")
+        .where(Job.employer_id == uid)
+    )
+    total = (await session.execute(count_stmt)).scalar() or 0
+    total_pages = max(1, math.ceil(total / per_page))
+    offset = (page - 1) * per_page
+
+    jobs_stmt = (
+        select(Job)
+        .where(Job.status == "active")
+        .where(Job.employer_id == uid)
+        .order_by(Job.date_posted.desc().nullslast())
+        .offset(offset)
+        .limit(per_page)
+    )
+    jobs_rows = (await session.execute(jobs_stmt)).scalars().all()
+    jobs = [_job_to_template_obj(j) for j in jobs_rows]
+
+    # Top countries + categories for this employer
+    countries_result = await session.execute(
+        select(Job.location_country, func.count(Job.id))
+        .where(Job.status == "active")
+        .where(Job.employer_id == uid)
+        .where(Job.location_country.isnot(None))
+        .group_by(Job.location_country)
+        .order_by(func.count(Job.id).desc())
+        .limit(8)
+    )
+    countries = [{"code": c, "name": _COUNTRY_NAMES.get(c, c), "count": n} for c, n in countries_result.all()]
+
+    employer_obj = {
+        "id": str(employer.id),
+        "name": employer.name,
+        "domain": employer.domain,
+        "logo_url": employer.logo_url,
+        "ats_platform": employer.ats_platform,
+        "career_page_url": employer.career_page_url,
+        "country": employer.country,
+        "initial": (employer.name[:1] or "?").upper(),
+        "active_job_count": total,
+    }
+
+    return templates.TemplateResponse(request, "employer_detail.html", {
+        "employer": employer_obj,
+        "jobs": jobs,
+        "countries": countries,
         "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
     })
 

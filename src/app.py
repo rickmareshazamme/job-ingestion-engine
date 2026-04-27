@@ -10,6 +10,7 @@ from src.api.feed_inbound import router as feed_inbound_router
 from src.api.employers import router as employers_router
 from src.api.frontend import router as frontend_router
 from src.api.jobs import router as jobs_router
+from src.api.legal import router as legal_router
 from src.api.map_view import router as map_router
 from src.api.sitemap import router as sitemap_router
 from src.api.stats import router as stats_router
@@ -146,6 +147,7 @@ app.include_router(sitemap_router)
 app.include_router(country_router)
 app.include_router(data_router)
 app.include_router(map_router)
+app.include_router(legal_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)

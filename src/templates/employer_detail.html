@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employer.name }} jobs — zammejobs{% endblock %}
+{% block meta_description %}{{ employer.active_job_count }} active jobs at {{ employer.name }}. Apply directly via {{ employer.ats_platform | capitalize if employer.ats_platform else "their career site" }}.{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "{{ employer.name }}",
+  "url": "https://{{ employer.domain }}",
+  "logo": "{{ employer.logo_url or '' }}",
+  "numberOfEmployees": "Unknown"
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="employer-page">
+  <header class="employer-header">
+    {% if employer.logo_url %}
+    <img src="{{ employer.logo_url }}" alt="" class="emp-detail-logo" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="emp-detail-logo emp-logo-fallback" style="display:none">{{ employer.initial }}</div>
+    {% else %}
+    <div class="emp-detail-logo emp-logo-fallback">{{ employer.initial }}</div>
+    {% endif %}
+    <div>
+      <h1>{{ employer.name }}</h1>
+      <p class="emp-detail-meta">
+        {% if employer.domain %}<span>{{ employer.domain }}</span>{% endif %}
+        {% if employer.ats_platform %}<span>&middot; {{ employer.ats_platform | capitalize }}</span>{% endif %}
+        {% if employer.country %}<span>&middot; {{ employer.country }}</span>{% endif %}
+      </p>
+      <p class="emp-detail-stat">
+        <strong>{{ "{:,}".format(employer.active_job_count) }}</strong> active jobs
+        {% if employer.career_page_url %}<a href="{{ employer.career_page_url }}" target="_blank" rel="noopener" class="emp-link">Visit career page &rarr;</a>{% endif %}
+      </p>
+    </div>
+  </header>
+
+  {% if countries %}
+  <section class="emp-countries">
+    <h2>Hiring in</h2>
+    <div class="emp-country-tags">
+      {% for c in countries %}
+      <a href="/search?employer={{ employer.domain }}&country={{ c.code }}" class="tag">{{ c.name }} ({{ c.count }})</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="emp-jobs">
+    <h2>Open positions</h2>
+    {% for job in jobs %}
+    <article class="job-card">
+      <h3><a href="/jobs/{{ job.id }}">{{ job.title }}</a></h3>
+      <p class="meta">
+        {% if job.location.city %}{{ job.location.city }}, {% endif %}{{ job.location.country or "" }}
+        {% if job.is_remote %} · <span style="color: var(--color-remote);">Remote</span>{% endif %}
+        {% if job.salary.min %} · <span style="color: var(--color-salary);">{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}-{{ "{:,}".format(job.salary.max) }}{% endif %}</span>{% endif %}
+      </p>
+    </article>
+    {% else %}
+    <p class="empty">No active jobs right now.</p>
+    {% endfor %}
+
+    {% if meta.total_pages > 1 %}
+    <nav class="pagination">
+      {% if meta.page > 1 %}<a href="/employers/{{ employer.id }}?page={{ meta.page - 1 }}">Prev</a>{% endif %}
+      <span>Page {{ meta.page }} of {{ meta.total_pages }}</span>
+      {% if meta.page < meta.total_pages %}<a href="/employers/{{ employer.id }}?page={{ meta.page + 1 }}">Next</a>{% endif %}
+    </nav>
+    {% endif %}
+  </section>
+</div>
+
+<style>
+  .employer-page { max-width: 800px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+  .employer-header { display: flex; gap: 1.25rem; align-items: flex-start; margin-bottom: 2rem; }
+  .emp-detail-logo {
+    width: 72px; height: 72px; flex-shrink: 0;
+    border-radius: var(--radius-md); object-fit: cover;
+    background: var(--color-bg-card);
+  }
+  .emp-detail-logo.emp-logo-fallback {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; font-weight: 800; color: var(--color-text-muted);
+  }
+  .emp-detail-meta { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0.25rem 0 0.5rem; }
+  .emp-detail-stat { font-size: var(--text-base); }
+  .emp-detail-stat strong { font-size: var(--text-xl); color: var(--color-accent); margin-right: 0.5rem; }
+  .emp-link { margin-left: 1rem; }
+  .emp-countries { margin-bottom: 2rem; }
+  .emp-countries h2 { font-size: var(--text-lg); margin-bottom: 0.75rem; color: var(--color-text-secondary); }
+  .emp-country-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .emp-country-tags .tag { padding: 0.375rem 0.75rem; }
+  .emp-jobs h2 { font-size: var(--text-xl); margin: 1.5rem 0 1rem; }
+  .emp-jobs .job-card { padding: 1rem; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); margin-bottom: 0.75rem; }
+  .emp-jobs .job-card h3 { font-size: var(--text-base); margin-bottom: 0.25rem; }
+  .emp-jobs .meta { color: var(--color-text-muted); font-size: var(--text-sm); }
+</style>
+{% endblock %}

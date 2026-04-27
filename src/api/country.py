@@ -231,6 +231,26 @@ async def country_sitemap(
     return Response(content=xml, media_type="application/xml")
 
 
+@router.get("/map", response_class=HTMLResponse)
+async def country_map(request: Request, country: str, session: AsyncSession = Depends(get_session)):
+    """Country-scoped /map: same Leaflet UI but pre-filtered to one ISO code."""
+    meta = _validate_country(country)
+    iso = country.upper()
+    if iso == "UK":
+        iso = "GB"
+    total = (await session.execute(
+        select(func.count()).select_from(Job)
+        .where(Job.status == "active")
+        .where(Job.location_country == iso)
+        .where(Job.location_lat.isnot(None))
+    )).scalar() or 0
+    return templates.TemplateResponse(request, "map.html", {
+        "total_with_coords": total,
+        "preset_country": iso,
+        "preset_q": "",
+    })
+
+
 @router.get("/llms.txt", response_class=PlainTextResponse)
 async def country_llms_txt(
     request: Request,
