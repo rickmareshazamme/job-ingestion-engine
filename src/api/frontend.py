@@ -146,7 +146,7 @@ async def homepage(request: Request, session: AsyncSession = Depends(get_session
         "jobs_by_ats": {r[0]: r[1] for r in ats_result.all() if r[0]},
     }
 
-    return templates.TemplateResponse("home.html", {"request": request, "stats": stats})
+    return templates.TemplateResponse(request, "home.html", {"stats": stats})
 
 
 @router.get("/search", response_class=HTMLResponse)
@@ -220,8 +220,7 @@ async def search_page(
         "seniority": seniority,
     }
 
-    return templates.TemplateResponse("search.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "search.html", {
         "jobs": jobs,
         "q": q,
         "filters": filters,
@@ -250,8 +249,7 @@ async def job_detail_page(
     job_obj = _job_to_template_obj(job)
     json_ld = _build_json_ld(job)
 
-    return templates.TemplateResponse("job_detail.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "job_detail.html", {
         "job": job_obj,
         "json_ld": json_ld,
     })
@@ -307,8 +305,7 @@ async def employers_page(
         for row in rows
     ]
 
-    return templates.TemplateResponse("employers.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "employers.html", {
         "employers": employers,
         "q": q,
         "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
