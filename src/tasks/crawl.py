@@ -140,6 +140,7 @@ def crawl_source(self, source_config_id: str):
             # Normalize and upsert
             jobs_new = 0
             jobs_updated = 0
+            new_urls: list[str] = []
 
             for raw_job in raw_jobs:
                 try:
@@ -147,12 +148,31 @@ def crawl_source(self, source_config_id: str):
                     result = _upsert_job(session, job)
                     if result == "new":
                         jobs_new += 1
+                        new_urls.append(f"https://{settings.site_domain}/jobs/{job.id}")
                     else:
                         jobs_updated += 1
                 except Exception as e:
                     logger.warning("Failed to normalize/upsert job from %s: %s", source_desc, str(e)[:100])
 
             session.commit()
+
+            # Push new URLs to IndexNow + Google Indexing API. Best-effort —
+            # failures don't fail the crawl.
+            if new_urls:
+                try:
+                    from src.indexing.indexnow import submit_urls as indexnow_submit
+                    submitted = _run_async(indexnow_submit(new_urls))
+                    if submitted:
+                        logger.info("IndexNow: submitted %d new job URLs", submitted)
+                except Exception as e:
+                    logger.warning("IndexNow dispatch failed: %s", str(e)[:120])
+                try:
+                    from src.indexing.google import notify_url_updated
+                    # Google Indexing free quota is 200/day, so cap per-crawl
+                    for u in new_urls[:200]:
+                        _run_async(notify_url_updated(u))
+                except Exception as e:
+                    logger.warning("Google Indexing dispatch failed: %s", str(e)[:120])
 
             # Update crawl run
             duration = (datetime.utcnow() - start_time).total_seconds()

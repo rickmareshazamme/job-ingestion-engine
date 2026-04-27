@@ -34,6 +34,9 @@ jinja2
 # Utilities
 python-dotenv
 
+# Google Indexing API (optional — only used if GOOGLE_SA_FILE is set)
+google-auth
+
 # Testing
 pytest
 pytest-asyncio
