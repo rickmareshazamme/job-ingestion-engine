@@ -33,17 +33,17 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/30"),
         "kwargs": {"batch_size": 5000},
     },
-    # Weekly Common Crawl JobPosting harvest — Sundays 04:00 UTC.
-    # Heavy job: streams multi-GB WDC files, can take 1-3 hours.
-    "harvest-common-crawl": {
-        "task": "src.tasks.crawl.harvest_common_crawl",
-        "schedule": crontab(hour=4, minute=0, day_of_week=0),
-        "kwargs": {
-            "crawl_id": "2024-12",
-            "max_files": 3,
-            "max_records": 100_000,
-        },
-    },
+    # Common Crawl harvest is DISABLED for live ingestion — WDC's
+    # 2024-12 extract is from October 2024, so every JobPosting in it is
+    # at least 18 months old by the time we'd ingest it. We only want
+    # live jobs in the active index.
+    #
+    # CC remains useful as a DISCOVERY source: scan the lookup file for
+    # employer domains we don't yet crawl, then add them to source_configs
+    # so the Tier-1 connectors fetch their LIVE jobs. Run that manually
+    # via scripts.harvest_common_crawl --discovery (TODO).
+    #
+    # "harvest-common-crawl": disabled
 }
 
 
