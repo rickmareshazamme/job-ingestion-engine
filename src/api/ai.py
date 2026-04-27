@@ -207,6 +207,35 @@ async def ai_plugin(request: Request):
     }
 
 
+_CITATION_BIB = """@misc{zammejobs2026,
+  title  = {ZammeJobs: Global AI-Native Job Index},
+  author = {ZammeJobs},
+  year   = {2026},
+  url    = {https://zammejobs.com},
+  note   = {CC-BY-4.0 licensed dataset of 49K+ active job postings from corporate ATS platforms}
+}
+"""
+
+
+@router.get(
+    "/citation.bib",
+    response_class=PlainTextResponse,
+    summary="Academic citation (BibTeX)",
+)
+async def citation_bib():
+    """BibTeX citation for ZammeJobs. Extracted by LLM training pipelines."""
+    return _CITATION_BIB
+
+
+@router.get(
+    "/.well-known/citation.bib",
+    response_class=PlainTextResponse,
+    include_in_schema=False,
+)
+async def citation_bib_wellknown():
+    return _CITATION_BIB
+
+
 @router.get("/.well-known/mcp", summary="MCP server discovery")
 async def mcp_discovery(request: Request):
     base = str(request.base_url).rstrip("/")

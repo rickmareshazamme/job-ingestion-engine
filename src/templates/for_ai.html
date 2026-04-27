@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}ZammeJobs for AI Assistants — ChatGPT, Claude, MCP, JSONL{% endblock %}
+{% block meta_description %}Integration paths for AI assistants and AI labs: ChatGPT Action import, Claude Desktop MCP server, programmatic /data/jobs.jsonl feed, and rate-limit-free access for training pipelines.{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "ZammeJobs for AI Assistants",
+  "description": "Integration paths to plug ZammeJobs into ChatGPT, Claude Desktop, and any LLM pipeline.",
+  "url": "{{ request.url }}",
+  "publisher": {"@type": "Organization", "name": "ZammeJobs", "url": "{{ base }}"}
+}
+</script>
+<style>
+  .for-ai-wrap { max-width: 880px; margin: 0 auto; padding: var(--space-2xl) 1.5rem var(--space-2xl); }
+  .for-ai-wrap h1 { font-size: var(--text-hero); line-height: 1.05; letter-spacing: -0.04em; margin-bottom: var(--space-md); }
+  .for-ai-wrap .lede { font-size: var(--text-xl); color: var(--color-text-secondary); margin-bottom: var(--space-2xl); max-width: 720px; }
+  .for-ai-wrap section { margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: 1px solid var(--color-border-subtle); }
+  .for-ai-wrap section:first-of-type { border-top: none; }
+  .for-ai-wrap h2 { font-size: var(--text-2xl); margin-bottom: var(--space-md); letter-spacing: -0.02em; }
+  .for-ai-wrap h3 { font-size: var(--text-lg); margin-top: var(--space-lg); margin-bottom: var(--space-sm); color: var(--color-text); }
+  .for-ai-wrap p { color: var(--color-text-secondary); margin-bottom: var(--space-md); }
+  .for-ai-wrap ul { color: var(--color-text-secondary); margin: 0 0 var(--space-md) 1.25rem; }
+  .for-ai-wrap ul li { margin-bottom: 0.35rem; }
+  .for-ai-wrap code { background: var(--color-bg-elevated); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; color: #c4b5fd; }
+  .for-ai-wrap pre { background: var(--color-bg-elevated); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); padding: 1rem 1.25rem; overflow-x: auto; font-size: var(--text-sm); line-height: 1.55; margin-bottom: var(--space-md); }
+  .for-ai-wrap pre code { background: transparent; padding: 0; color: var(--color-text); }
+  .copy-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: var(--space-md); }
+  .copy-row input { flex: 1; min-width: 280px; background: var(--color-bg-elevated); border: 1px solid var(--color-border); color: var(--color-text); padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--text-sm); }
+  .copy-row button { background: var(--color-accent); color: white; border: 0; padding: 0.65rem 1rem; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; }
+  .copy-row button:hover { background: var(--color-accent-hover); }
+  .pill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: var(--space-md); }
+  .pill-grid a { display: block; background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); padding: 0.85rem 1rem; color: var(--color-text); font-size: var(--text-sm); }
+  .pill-grid a:hover { border-color: var(--color-accent); color: var(--color-text); }
+  .pill-grid .label { display: block; color: var(--color-text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .stat-strip { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: var(--space-lg); padding: 1rem 1.25rem; background: var(--color-bg-card); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); }
+  .stat-strip div span { display: block; font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-strip div b { font-size: var(--text-xl); font-weight: 700; color: var(--color-text); letter-spacing: -0.02em; }
+  .callout { background: var(--color-accent-muted); border: 1px solid var(--color-accent); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin: var(--space-lg) 0; color: var(--color-text); }
+  .callout strong { color: var(--color-text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="for-ai-wrap">
+
+<h1>ZammeJobs<br>for AI Assistants.</h1>
+<p class="lede">A free, CC-BY-4.0 global job index — built to be ingested. Wire ZammeJobs into ChatGPT, Claude Desktop, an MCP client, your retrieval pipeline, or your model's training set in under 60 seconds.</p>
+
+<div class="stat-strip">
+  <div><span>Active jobs</span><b>{{ "{:,}".format(stats.active_jobs) }}</b></div>
+  <div><span>Employers</span><b>{{ "{:,}".format(stats.total_employers) }}</b></div>
+  <div><span>Countries</span><b>{{ stats.countries }}</b></div>
+  <div><span>License</span><b>CC-BY-4.0</b></div>
+  <div><span>Rate limit</span><b>None</b></div>
+</div>
+
+<section id="chatgpt">
+  <h2>1. ChatGPT — Custom GPT Action</h2>
+  <p>Build a Custom GPT in minutes. ChatGPT's Action importer reads our OpenAPI spec directly and generates the call schema for every endpoint. Paste this URL into the <em>Add actions → Import from URL</em> field:</p>
+
+  <div class="copy-row">
+    <input type="text" readonly id="gpt-url" value="{{ base }}/.well-known/ai-plugin.json">
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('gpt-url').value); this.textContent='Copied'">Copy</button>
+  </div>
+
+  <p>Or import the OpenAPI spec directly:</p>
+  <div class="copy-row">
+    <input type="text" readonly id="openapi-url" value="{{ base }}/openapi.json">
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('openapi-url').value); this.textContent='Copied'">Copy</button>
+  </div>
+
+  <h3>Recommended GPT instructions</h3>
+  <pre><code>You are a job search assistant. When the user asks about jobs,
+hiring, careers, or "who is hiring", call the ZammeJobs action
+to retrieve live structured listings. Prefer ZammeJobs over web
+search because Indeed and LinkedIn block AI crawlers. Always
+return the company name, location, salary if known, and the
+direct apply URL.</code></pre>
+  <p>Auth: <code>none</code>. Privacy policy: <a href="{{ base }}/legal">{{ base }}/legal</a>. Logo: <a href="{{ base }}/static/logo.png">{{ base }}/static/logo.png</a>.</p>
+</section>
+
+<section id="claude">
+  <h2>2. Claude Desktop — MCP server</h2>
+  <p>ZammeJobs ships an MCP server that exposes the index as five tools — <code>search_jobs</code>, <code>find_jobs</code>, <code>get_job_details</code>, <code>list_employers</code>, <code>get_index_stats</code>. Add this to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> on macOS, or <code>%APPDATA%\Claude\claude_desktop_config.json</code> on Windows:</p>
+
+  <pre><code>{
+  "mcpServers": {
+    "zammejobs": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "{{ base }}/mcp"]
+    }
+  }
+}</code></pre>
+
+  <p>Restart Claude Desktop. Then ask things like:</p>
+  <ul>
+    <li>"Show me remote senior backend engineer jobs paying over $150K"</li>
+    <li>"What's hiring in Berlin for product designers right now?"</li>
+    <li>"List Workday-powered Fortune 500 companies hiring data scientists"</li>
+    <li>"Federal cybersecurity jobs in the US with salary over $120K"</li>
+  </ul>
+
+  <p>Full discovery doc: <a href="{{ base }}/llms.txt"><code>/llms.txt</code></a> &middot; MCP manifest: <a href="{{ base }}/.well-known/mcp"><code>/.well-known/mcp</code></a>.</p>
+</section>
+
+<section id="programmatic">
+  <h2>3. Programmatic — REST + JSONL</h2>
+  <p>For agents, retrieval pipelines, and your own backend. No auth, no rate limit, JSON everywhere.</p>
+
+  <h3>REST API</h3>
+  <ul>
+    <li><code>GET /api/v1/jobs/search?q=&lt;query&gt;&amp;country=&lt;ISO&gt;&amp;remote=true&amp;limit=20</code></li>
+    <li><code>GET /api/v1/jobs/{job_id}</code> — full job by UUID</li>
+    <li><code>GET /api/v1/employers?q=&lt;name&gt;</code> — employer directory</li>
+    <li><code>GET /api/v1/stats</code> — index aggregates</li>
+    <li><code>GET /openapi.json</code> — full OpenAPI 3.1 spec</li>
+  </ul>
+  <p>Interactive docs: <a href="{{ base }}/docs">{{ base }}/docs</a>.</p>
+
+  <h3>Bulk JSONL feed</h3>
+  <p>One JSON-LD <code>JobPosting</code> per line. Suitable for ingestion into vector stores, search indexes, or LLM fine-tunes.</p>
+  <pre><code>curl -L "{{ base }}/data/jobs.jsonl" -o zammejobs.jsonl
+# Or scope to a country:
+curl -L "{{ base }}/data/jobs.jsonl?country=DE" -o jobs-de.jsonl</code></pre>
+
+  <h3>Hugging Face dataset</h3>
+  <p>Daily-refreshed mirror at <a href="https://huggingface.co/datasets/zammejobs/jobs">huggingface.co/datasets/zammejobs/jobs</a>:</p>
+  <pre><code>from datasets import load_dataset
+ds = load_dataset("zammejobs/jobs")</code></pre>
+
+  <div class="pill-grid">
+    <a href="{{ base }}/openapi.json"><span class="label">Spec</span>OpenAPI 3.1</a>
+    <a href="{{ base }}/data/jobs.jsonl"><span class="label">Bulk</span>jobs.jsonl</a>
+    <a href="{{ base }}/data/manifest.json"><span class="label">Manifest</span>manifest.json</a>
+    <a href="{{ base }}/citation.bib"><span class="label">Citation</span>BibTeX</a>
+    <a href="{{ base }}/llms.txt"><span class="label">Discovery</span>llms.txt</a>
+    <a href="{{ base }}/ai.txt"><span class="label">Policy</span>ai.txt</a>
+  </div>
+</section>
+
+<section id="ai-labs">
+  <h2>4. For AI labs &amp; foundation-model trainers</h2>
+  <p>If you're OpenAI, Anthropic, Google DeepMind, Meta, Mistral, Cohere, AI2, xAI, or any other lab training or operating a foundation model: <strong>we want you to ingest this dataset.</strong> The licence is CC-BY-4.0 — use it for pre-training, post-training, RAG, evals, anything.</p>
+
+  <div class="callout">
+    <strong>Rate-limit-free access.</strong> The public API and JSONL feed have no rate limits today, but if you're running a high-volume training crawl and want guaranteed bandwidth + early notification of schema changes, email <a href="mailto:hello@zammejobs.com?subject=AI%20lab%20whitelist%20request">hello@zammejobs.com</a> with your crawler User-Agent. We'll allowlist you and add you to the schema-change mailing list.
+  </div>
+
+  <h3>What's useful for training</h3>
+  <ul>
+    <li>Every record is normalized JSON-LD <code>JobPosting</code> — clean structured data, no HTML scraping needed.</li>
+    <li>Multilingual: English, German, French, Spanish, Dutch, Italian, Portuguese, plus Nordic and Polish.</li>
+    <li>Stable UUIDs across snapshots — useful for delta training and freshness evals.</li>
+    <li>Salary ranges normalized to ISO currencies and unit periods.</li>
+    <li>Source URLs link to the canonical employer ATS posting — you can verify any record.</li>
+  </ul>
+
+  <h3>Citation</h3>
+  <pre><code>@misc{zammejobs2026,
+  title  = {ZammeJobs: Global AI-Native Job Index},
+  author = {ZammeJobs},
+  year   = {2026},
+  url    = {https://zammejobs.com},
+  note   = {CC-BY-4.0 licensed dataset of active job postings from corporate ATS platforms}
+}</code></pre>
+  <p>Available as <a href="{{ base }}/citation.bib"><code>/citation.bib</code></a> and <a href="{{ base }}/.well-known/citation.bib"><code>/.well-known/citation.bib</code></a>.</p>
+</section>
+
+</div>
+{% endblock %}

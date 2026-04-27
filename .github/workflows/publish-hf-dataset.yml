@@ -1,0 +1,167 @@
+name: Publish ZammeJobs dataset to Hugging Face
+
+# Strategic play: every major LLM trainer (OpenAI, Anthropic, Google, Meta,
+# Mistral, Cohere, AI2) scrapes Hugging Face datasets. Mirroring the public
+# JSONL feed to `zammejobs/jobs` daily means models trained from now on will
+# know about ZammeJobs natively — distribution into training data, not just
+# retrieval.
+
+on:
+  schedule:
+    # 06:00 UTC every day — after the nightly crawl batch, before EU business hours
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-hf-dataset
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Mirror /data/jobs.jsonl to zammejobs/jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_BASE: https://web-production-10b8.up.railway.app
+      HF_REPO_ID: zammejobs/jobs
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+    steps:
+      - name: Check out repo (for README template)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub
+        run: |
+          python -m pip install --upgrade pip
+          pip install "huggingface_hub>=0.24.0"
+
+      - name: Verify HF_TOKEN is configured
+        run: |
+          if [ -z "${HF_TOKEN}" ]; then
+            echo "::error::HF_TOKEN secret is not set on this repository."
+            exit 1
+          fi
+
+      - name: Download jobs.jsonl from production
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "Fetching ${SOURCE_BASE}/data/jobs.jsonl ..."
+          curl --fail --silent --show-error --location \
+            --retry 5 --retry-delay 10 --retry-all-errors \
+            --max-time 1500 \
+            -H "Accept: application/x-jsonlines" \
+            -H "User-Agent: zammejobs-hf-mirror/1.0 (+https://zammejobs.com)" \
+            -o out/jobs.jsonl \
+            "${SOURCE_BASE}/data/jobs.jsonl"
+          ls -lh out/jobs.jsonl
+          wc -l out/jobs.jsonl
+
+      - name: Fetch dataset manifest (for record count)
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 5 \
+            -H "User-Agent: zammejobs-hf-mirror/1.0" \
+            -o out/manifest.json \
+            "${SOURCE_BASE}/data/manifest.json"
+          cat out/manifest.json
+
+      - name: Gzip JSONL
+        run: |
+          set -euo pipefail
+          gzip -9 -k out/jobs.jsonl
+          ls -lh out/
+
+      - name: Render README.md with current job count
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          manifest = json.loads(Path("out/manifest.json").read_text())
+          total = manifest.get("total_records", 0)
+          today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+          template = Path("hf_dataset/README.md").read_text()
+          rendered = (
+              template
+              .replace("{{TOTAL_RECORDS}}", f"{total:,}")
+              .replace("{{LAST_UPDATED}}", today)
+          )
+          Path("out/README.md").write_text(rendered)
+          print(f"Rendered README.md — {total:,} records, dated {today}")
+          PY
+
+      - name: Upload dataset to Hugging Face
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi, CommitOperationAdd
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_REPO_ID"]
+
+          # Ensure the dataset repo exists. exist_ok=True makes this idempotent.
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="dataset",
+              exist_ok=True,
+              private=False,
+          )
+
+          ops = [
+              CommitOperationAdd(
+                  path_in_repo="jobs.jsonl.gz",
+                  path_or_fileobj="out/jobs.jsonl.gz",
+              ),
+              CommitOperationAdd(
+                  path_in_repo="manifest.json",
+                  path_or_fileobj="out/manifest.json",
+              ),
+              CommitOperationAdd(
+                  path_in_repo="README.md",
+                  path_or_fileobj="out/README.md",
+              ),
+          ]
+
+          info = api.create_commit(
+              repo_id=repo_id,
+              repo_type="dataset",
+              operations=ops,
+              commit_message=f"chore: daily mirror from zammejobs.com",
+              commit_description=(
+                  "Automated daily snapshot of the ZammeJobs public job index.\n"
+                  "Source: https://web-production-10b8.up.railway.app/data/jobs.jsonl\n"
+                  "License: CC-BY-4.0"
+              ),
+          )
+          print(f"Committed: {info.commit_url}")
+          PY
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Hugging Face dataset publish"
+            echo ""
+            echo "- Repo: \`${HF_REPO_ID}\`"
+            echo "- Source: \`${SOURCE_BASE}/data/jobs.jsonl\`"
+            if [ -f out/jobs.jsonl ]; then
+              echo "- Lines: \`$(wc -l < out/jobs.jsonl)\`"
+              echo "- Size (raw): \`$(du -h out/jobs.jsonl | cut -f1)\`"
+            fi
+            if [ -f out/jobs.jsonl.gz ]; then
+              echo "- Size (gz): \`$(du -h out/jobs.jsonl.gz | cut -f1)\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
