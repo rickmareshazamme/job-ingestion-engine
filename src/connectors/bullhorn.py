@@ -101,7 +101,7 @@ class BullhornConnector(BaseConnector):
     ATS_PLATFORM = "bullhorn"
 
     PAGE_SIZE = 200
-    MAX_PAGES = 50  # cap any single board at 10K jobs per crawl
+    MAX_PAGES = 250  # cap any single board at 50K jobs per crawl (Aequor has 15K+)
 
     FIELDS = ",".join([
         "id",
