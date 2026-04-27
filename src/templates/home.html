@@ -3,6 +3,29 @@
 {% block title %}ZammeJobs — Every Job, Every ATS, AI-Searchable{% endblock %}
 {% block meta_description %}Free global job index. Every corporate career site — Workday, Greenhouse, Lever, Taleo — indexed and searchable by AI.{% endblock %}
 
+{% block head_extra %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "JobsCatalog",
+  "name": "ZammeJobs",
+  "url": "{{ request.base_url }}",
+  "description": "Global AI-native job index. Aggregates millions of structured job listings from corporate ATS platforms invisible to AI search.",
+  "numberOfItems": {{ stats.active_jobs }},
+  "provider": {
+    "@type": "Organization",
+    "name": "ZammeJobs",
+    "url": "{{ request.base_url }}"
+  },
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "{{ request.base_url }}search?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+{% endblock %}
+
 {% block content %}
 <section class="hero">
     <div class="hero-badge">

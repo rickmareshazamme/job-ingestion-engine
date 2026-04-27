@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{% if q %}{{ q }} jobs in {{ country_name }}{% else %}Jobs in {{ country_name }}{% endif %} — ZammeJobs{% endblock %}
+
+{% block head_extra %}
+<link rel="alternate" hreflang="{{ country_lang }}" href="{{ request.base_url }}in/{{ country_code }}/search{% if q %}?q={{ q }}{% endif %}" />
+<meta name="description" content="{{ '{:,}'.format(meta.total) }} {{ q or 'all' }} jobs in {{ country_name }}." />
+{% endblock %}
+
+{% block content %}
+<section class="search-header">
+    <h1>{% if q %}{{ q }} jobs{% else %}All jobs{% endif %} in {{ country_name }}</h1>
+    <p>{{ '{:,}'.format(meta.total) }} matches · salaries in {{ country_currency }}</p>
+    <form action="/in/{{ country_code }}/search" method="get" class="search-form">
+        <input type="search" name="q" value="{{ q or '' }}" placeholder="Job title, skill..." />
+        <button type="submit">Search</button>
+    </form>
+</section>
+
+<section class="results">
+    {% for job in jobs %}
+    <article class="job-card">
+        <h3><a href="/jobs/{{ job.id }}">{{ job.title }}</a></h3>
+        <p class="employer">{{ job.employer_name }}</p>
+        <p class="meta">
+            {% if job.location.city %}{{ job.location.city }}, {% endif %}
+            {{ job.location.country or country_iso }}
+            {% if job.is_remote %} · Remote{% endif %}
+        </p>
+        {% if job.salary.min or job.salary.max %}
+        <p class="salary">{{ job.salary.currency or country_currency }} {{ '{:,}'.format(job.salary.min or 0) }} – {{ '{:,}'.format(job.salary.max or 0) }}</p>
+        {% endif %}
+    </article>
+    {% else %}
+    <p class="empty">No matches yet. Try a broader query or browse <a href="/in/{{ country_code }}/">{{ country_name }} jobs</a>.</p>
+    {% endfor %}
+</section>
+
+{% if meta.total_pages > 1 %}
+<nav class="pagination">
+    {% if meta.page > 1 %}
+    <a href="/in/{{ country_code }}/search?q={{ q or '' }}&page={{ meta.page - 1 }}">Prev</a>
+    {% endif %}
+    <span>Page {{ meta.page }} of {{ meta.total_pages }}</span>
+    {% if meta.page < meta.total_pages %}
+    <a href="/in/{{ country_code }}/search?q={{ q or '' }}&page={{ meta.page + 1 }}">Next</a>
+    {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

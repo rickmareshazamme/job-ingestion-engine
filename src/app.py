@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.ai import router as ai_router
+from src.api.country import router as country_router
+from src.api.data import router as data_router
 from src.api.employer_register import router as employer_register_router
 from src.api.employers import router as employers_router
 from src.api.frontend import router as frontend_router
@@ -39,6 +41,8 @@ app.include_router(stats_router)
 app.include_router(ai_router)
 app.include_router(employer_register_router)
 app.include_router(sitemap_router)
+app.include_router(country_router)
+app.include_router(data_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs in {{ country_name }} — ZammeJobs{% endblock %}
+
+{% block head_extra %}
+<link rel="alternate" hreflang="{{ country_lang }}" href="{{ request.base_url }}in/{{ country_code }}/" />
+<link rel="alternate" hreflang="x-default" href="{{ request.base_url }}" />
+<meta name="description" content="{{ '{:,}'.format(total_jobs) }} active jobs in {{ country_name }} indexed across Greenhouse, Workday, Lever and aggregators. Free, AI-searchable, no signup." />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "JobsCatalog",
+  "name": "ZammeJobs — {{ country_name }}",
+  "url": "{{ request.base_url }}in/{{ country_code }}/",
+  "numberOfItems": {{ total_jobs }},
+  "areaServed": {"@type": "Country", "name": "{{ country_name }}"},
+  "currenciesAccepted": "{{ country_currency }}",
+  "inLanguage": "{{ country_lang }}"
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-inner">
+        <h1>Jobs in {{ country_name }}</h1>
+        <p class="lede">
+            <strong>{{ '{:,}'.format(total_jobs) }}</strong> active jobs indexed from corporate ATS platforms and aggregators.
+            All salaries normalized to {{ country_currency }}.
+        </p>
+        <form action="/in/{{ country_code }}/search" method="get" class="hero-search">
+            <input type="search" name="q" placeholder="Job title, skill, company..." autofocus />
+            <button type="submit">Search {{ country_name }}</button>
+        </form>
+    </div>
+</section>
+
+<section class="stats">
+    <h2>By source</h2>
+    <ul class="ats-list">
+        {% for ats, count in jobs_by_ats.items() %}
+        <li><span>{{ ats | capitalize }}</span><strong>{{ '{:,}'.format(count) }}</strong></li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}
