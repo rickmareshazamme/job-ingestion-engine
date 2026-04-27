@@ -203,10 +203,23 @@ async def normalize_and_count(raw_jobs):
     return normalized
 
 
+def _arg_int(flag: str, default: int) -> int:
+    for a in sys.argv:
+        if a.startswith(flag + "="):
+            try:
+                return int(a.split("=", 1)[1])
+            except ValueError:
+                return default
+    return default
+
+
 async def main():
     quick = "--quick" in sys.argv
     greenhouse_only = "--greenhouse" in sys.argv
     workday_only = "--workday" in sys.argv
+    full = "--full" in sys.argv
+    gh_max = _arg_int("--gh-max", 0)  # 0 = no limit (all seeded boards)
+    wd_max = _arg_int("--wd-max", 0)
 
     all_raw = []
 
@@ -214,16 +227,26 @@ async def main():
         logger.info("Quick crawl — free sources only")
         all_raw = await crawl_free_sources()
     elif greenhouse_only:
-        logger.info("Greenhouse crawl")
-        all_raw = await crawl_greenhouse(max_boards=132)
+        n = gh_max or 10_000
+        logger.info("Greenhouse crawl (max %d boards)", n)
+        all_raw = await crawl_greenhouse(max_boards=n)
     elif workday_only:
-        logger.info("Workday crawl")
-        all_raw = await crawl_workday(max_instances=92)
-    else:
-        logger.info("Full crawl — all sources")
+        n = wd_max or 10_000
+        logger.info("Workday crawl (max %d instances)", n)
+        all_raw = await crawl_workday(max_instances=n)
+    elif full:
+        gh_n = gh_max or 10_000
+        wd_n = wd_max or 10_000
+        logger.info("FULL crawl — free + Greenhouse(%d) + Workday(%d)", gh_n, wd_n)
         all_raw.extend(await crawl_free_sources())
-        all_raw.extend(await crawl_greenhouse(max_boards=50))
-        all_raw.extend(await crawl_workday(max_instances=20))
+        all_raw.extend(await crawl_greenhouse(max_boards=gh_n))
+        all_raw.extend(await crawl_workday(max_instances=wd_n))
+    else:
+        # Conservative default for first-run smoke testing
+        logger.info("Default crawl — free + Greenhouse(50) + Workday(20). Use --full for everything.")
+        all_raw.extend(await crawl_free_sources())
+        all_raw.extend(await crawl_greenhouse(max_boards=gh_max or 50))
+        all_raw.extend(await crawl_workday(max_instances=wd_max or 20))
 
     logger.info("\nTotal raw jobs fetched: %d", len(all_raw))
     await normalize_and_count(all_raw)
