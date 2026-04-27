@@ -6,6 +6,7 @@ No authentication required for public job board API.
 Endpoint: GET https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs?content=true
 """
 
+import html as html_lib
 import logging
 from datetime import datetime
 from typing import Optional
@@ -80,7 +81,7 @@ class GreenhouseConnector(BaseConnector):
             source_id=str(job["id"]),
             source_url=job.get("absolute_url", f"https://boards.greenhouse.io/{board_token}/jobs/{job['id']}"),
             title=job.get("title", ""),
-            description_html=job.get("content", ""),
+            description_html=html_lib.unescape(job.get("content", "") or ""),
             employer_name=board_token,
             employer_domain=employer_domain,
             location_raw=location_name,

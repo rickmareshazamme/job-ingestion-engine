@@ -31,6 +31,23 @@ def strip_html(html: str) -> str:
     return " ".join(text.split())
 
 
+def unescape_if_escaped_html(s: str) -> str:
+    """Some ATS APIs return HTML-escaped content (e.g. Greenhouse returns
+    `&lt;p&gt;...&lt;/p&gt;` rather than `<p>...</p>`). Detect and unescape
+    once so templates can render with `| safe`. Leaves already-unescaped
+    HTML untouched.
+    """
+    if not s:
+        return ""
+    # Heuristic: if we see escaped tags but no real tags, unescape.
+    has_escaped = "&lt;" in s and "&gt;" in s
+    has_real = "<p>" in s or "<div" in s or "<ul>" in s or "<br" in s
+    if has_escaped and not has_real:
+        import html as _html
+        return _html.unescape(s)
+    return s
+
+
 async def normalize_job(raw: RawJob, do_geocode: bool = True) -> Job:
     """Normalize a RawJob into a canonical Job model instance.
 
@@ -45,8 +62,10 @@ async def normalize_job(raw: RawJob, do_geocode: bool = True) -> Job:
     8. Detect remote work
     9. Generate content hash
     """
-    # 1. Clean description
-    description_text = strip_html(raw.description_html)
+    # 1. Clean description (unescape if it came in HTML-escaped, e.g. Greenhouse)
+    description_html_clean = unescape_if_escaped_html(raw.description_html)
+    raw.description_html = description_html_clean
+    description_text = strip_html(description_html_clean)
 
     # 2. Parse location
     location = parse_location(raw.location_raw or "")
