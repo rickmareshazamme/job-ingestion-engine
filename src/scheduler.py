@@ -47,37 +47,6 @@ celery_app.conf.beat_schedule = {
 }
 
 
-@celery_app.task
-def crawl_all_due_sources():
-    """Find all source configs that are due for crawling and dispatch tasks."""
-    import uuid
-    from datetime import datetime, timedelta
-
-    from sqlalchemy import create_engine, select
-    from sqlalchemy.orm import sessionmaker
-
-    from src.config import settings
-    from src.models import SourceConfig
-    from src.tasks.crawl import crawl_source
-
-    engine = create_engine(settings.database_url_sync)
-    SessionLocal = sessionmaker(bind=engine)
-
-    with SessionLocal() as session:
-        configs = session.execute(
-            select(SourceConfig).where(SourceConfig.is_active == True)
-        ).scalars().all()
-
-        dispatched = 0
-        for config in configs:
-            if config.last_crawl_at is None:
-                # Never crawled — dispatch immediately
-                crawl_source.delay(str(config.id))
-                dispatched += 1
-            else:
-                next_crawl = config.last_crawl_at + timedelta(hours=config.crawl_interval_hours)
-                if datetime.utcnow() >= next_crawl:
-                    crawl_source.delay(str(config.id))
-                    dispatched += 1
-
-        return {"dispatched": dispatched, "total_configs": len(configs)}
+# NOTE: crawl_all_due_sources lives in src/tasks/crawl.py so Celery workers
+# (which only import that module) can find it. The beat schedule above
+# references src.tasks.crawl.crawl_all_due_sources accordingly.

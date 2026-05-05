@@ -675,3 +675,35 @@ def link_employers():
         return {"employers_created": created, "jobs_linked": linked}
     finally:
         session.close()
+
+
+@celery_app.task
+def crawl_all_due_sources():
+    """Find all source_configs that are due for crawling and dispatch crawl_source.
+
+    Runs every 30 min via Celery beat. The beat schedule registers this as
+    `src.tasks.crawl.crawl_all_due_sources` — this module path matters because
+    Celery workers only know tasks they've imported, and the worker imports
+    src.tasks.crawl (not src.scheduler).
+    """
+    session = _get_sync_session()
+    try:
+        configs = session.execute(
+            select(SourceConfig).where(SourceConfig.is_active == True)
+        ).scalars().all()
+
+        dispatched = 0
+        for config in configs:
+            if config.last_crawl_at is None:
+                crawl_source.delay(str(config.id))
+                dispatched += 1
+            else:
+                next_crawl = config.last_crawl_at + timedelta(hours=config.crawl_interval_hours)
+                if datetime.utcnow() >= next_crawl:
+                    crawl_source.delay(str(config.id))
+                    dispatched += 1
+
+        logger.info("crawl_all_due_sources: dispatched %d / %d source_configs", dispatched, len(configs))
+        return {"dispatched": dispatched, "total_configs": len(configs)}
+    finally:
+        session.close()
