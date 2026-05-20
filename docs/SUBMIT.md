@@ -124,7 +124,23 @@ Common Crawl crawls the open web monthly; their dumps feed almost every LLM trai
 
 ---
 
-## 9. Verification checklist
+## 9. LinkedIn — XML job feed (Limited Listings)
+
+LinkedIn's Job Posting API is partner-gated, but the XML feed is open: host the file, register the URL with a LinkedIn rep, jobs surface in LinkedIn search.
+
+Feed URL: `https://zammejobs.com/feeds/linkedin.xml`
+
+1. Run migration `002_employer_linkedin_fields` (`alembic upgrade head`) — adds `employers.linkedin_company_id` + `linkedin_poster_email`.
+2. Set `LINKEDIN_DEFAULT_POSTER_EMAIL` on Railway (Trust & Safety verification email).
+3. Backfill `employers.linkedin_company_id` for each employer that has a LinkedIn Page — the numeric ID from `linkedin.com/company/<id>/admin/`.
+4. Smoke-test: `curl -s https://zammejobs.com/feeds/linkedin.xml | xmllint --noout -`
+5. Email your LinkedIn Talent Solutions contact with the feed URL and request crawler registration.
+
+Full operator runbook + field mapping: see [LINKEDIN.md](LINKEDIN.md).
+
+---
+
+## 10. Verification checklist
 
 After submitting, run this from a clean machine:
 
@@ -143,7 +159,7 @@ Every line should return `200`.
 
 ---
 
-## 10. Ongoing
+## 11. Ongoing
 
 - Check Search Console weekly for indexing errors.
 - Check the GitHub Actions run history weekly — daily HF mirror should be green.
