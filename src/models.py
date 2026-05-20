@@ -31,6 +31,8 @@ class Employer(Base):
     country = Column(Text)
     employee_count = Column(Text)
     claimed = Column(Boolean, default=False)
+    linkedin_company_id = Column(Text)
+    linkedin_poster_email = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

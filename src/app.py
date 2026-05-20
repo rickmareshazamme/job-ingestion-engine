@@ -11,6 +11,7 @@ from src.api.employers import router as employers_router
 from src.api.frontend import router as frontend_router
 from src.api.jobs import router as jobs_router
 from src.api.legal import router as legal_router
+from src.api.linkedin_feed import router as linkedin_feed_router
 from src.api.map_view import router as map_router
 from src.api.sitemap import router as sitemap_router
 from src.api.stats import router as stats_router
@@ -71,6 +72,14 @@ TAGS_METADATA = [
     {
         "name": "Frontend",
         "description": "Server-side-rendered HTML pages with JSON-LD for Google Jobs, Bing, and AI search indexers.",
+    },
+    {
+        "name": "Feeds",
+        "description": (
+            "Partner-targeted job feeds in the formats each platform requires. "
+            "LinkedIn Basic Jobs XML at /feeds/linkedin.xml (register with your "
+            "LinkedIn Talent Solutions rep for ingestion)."
+        ),
     },
     {
         "name": "Employer Register",
@@ -148,6 +157,7 @@ app.include_router(country_router)
 app.include_router(data_router)
 app.include_router(map_router)
 app.include_router(legal_router)
+app.include_router(linkedin_feed_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)

@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     site_domain: str = "zammejobs.com"
     google_sa_file: str = ""
 
+    # LinkedIn XML job feed
+    # Fallback poster email when an employer has no linkedin_poster_email.
+    # LinkedIn Jobs Trust & Safety uses this to verify the posting entity.
+    linkedin_default_poster_email: str = "hello@zammejobs.com"
+    # LinkedIn rejects feeds aggregated from third-party sites, so by default
+    # the feed only includes jobs from claimed (self-registered) employers.
+    linkedin_feed_claimed_only: bool = True
+
     # Logging
     log_level: str = "INFO"
 
