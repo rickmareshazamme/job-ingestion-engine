@@ -16,6 +16,7 @@ case "${RAILWAY_SERVICE_NAME:-web}" in
     # "existing schema, no alembic_version" baseline case and is a
     # no-op on subsequent boots.
     python3 -m scripts.db_upgrade || true
+    python3 -m scripts.sync_shazamme_visibility || true
     exec uvicorn src.app:app --host 0.0.0.0 --port "${PORT:-8000}"
     ;;
 esac
