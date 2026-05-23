@@ -218,6 +218,20 @@ def crawl_source(self, source_config_id: str):
                 source_desc, len(raw_jobs), jobs_new, jobs_updated, duration,
             )
 
+            # When a Shazamme crawl lands the first batch of rows, flip the
+            # visibility gate so non-Shazamme jobs get hidden without waiting
+            # for the next web boot.
+            if (
+                config.source_type == "shazamme_feed"
+                and settings.shazamme_only_ingestion
+                and jobs_new > 0
+            ):
+                try:
+                    from scripts.sync_shazamme_visibility import main as sync_visibility
+                    sync_visibility()
+                except Exception as e:
+                    logger.warning("Post-crawl visibility sync failed: %s", str(e)[:200])
+
             return {
                 "status": "success",
                 "source": source_desc,

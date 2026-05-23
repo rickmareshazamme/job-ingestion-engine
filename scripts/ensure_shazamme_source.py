@@ -1,0 +1,76 @@
+"""Make sure ZammeJobs has a Shazamme feed SourceConfig + queued first crawl.
+
+Idempotent boot-time setup:
+  - If no SourceConfig with source_type='shazamme_feed' exists, INSERT one
+    pointing at the default Shazamme XML URL.
+  - If no jobs with source_type='shazamme_feed' exist yet, dispatch a
+    Celery crawl_source task immediately so the worker pulls the feed
+    instead of waiting up to 30 min for the next beat tick.
+
+Safe to run on every web boot — both branches are no-ops once the
+Shazamme data is in the DB.
+"""
+
+from __future__ import annotations
+
+import sys
+import uuid
+
+from sqlalchemy import create_engine, text
+
+from src.config import settings
+from src.connectors.shazamme import DEFAULT_FEED_URL
+
+
+def main() -> None:
+    engine = create_engine(settings.database_url_sync)
+    source_id: str | None = None
+    with engine.begin() as conn:
+        existing = conn.execute(text(
+            "SELECT id FROM source_configs WHERE source_type = 'shazamme_feed' LIMIT 1"
+        )).scalar()
+
+        if existing:
+            source_id = str(existing)
+            print(f"ensure_shazamme_source: source_config exists ({source_id})", flush=True)
+        else:
+            new_id = uuid.uuid4()
+            conn.execute(text("""
+                INSERT INTO source_configs
+                    (id, source_type, config, crawl_interval_hours, is_active, rate_limit_rpm)
+                VALUES
+                    (:id, 'shazamme_feed',
+                     CAST(:cfg AS JSONB),
+                     :interval, TRUE, :rpm)
+            """), {
+                "id": new_id,
+                "cfg": '{"board_token": "' + DEFAULT_FEED_URL + '"}',
+                "interval": settings.feed_crawl_interval_hours,
+                "rpm": 30,
+            })
+            source_id = str(new_id)
+            print(f"ensure_shazamme_source: created source_config {source_id}", flush=True)
+
+        shazamme_jobs = conn.execute(text(
+            "SELECT COUNT(*) FROM jobs WHERE source_type = 'shazamme_feed'"
+        )).scalar() or 0
+
+    engine.dispose()
+
+    if shazamme_jobs > 0:
+        print(f"ensure_shazamme_source: {shazamme_jobs} Shazamme jobs already present, no dispatch", flush=True)
+        return
+
+    # Kick off the first crawl via Celery so the worker — not the web
+    # boot path — actually downloads the 250MB feed.
+    from src.tasks.crawl import crawl_source
+    crawl_source.delay(source_id)
+    print(f"ensure_shazamme_source: dispatched crawl_source for {source_id}", flush=True)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"ensure_shazamme_source: FAILED — {e}", file=sys.stderr, flush=True)
+        sys.exit(0)
