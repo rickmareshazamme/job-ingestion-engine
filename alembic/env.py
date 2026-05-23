@@ -3,12 +3,16 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from src.config import settings
 from src.db import Base
 from src.models import Employer, SourceConfig, Job, CrawlRun  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override the localhost default in alembic.ini with the runtime DB URL.
+config.set_main_option("sqlalchemy.url", settings.database_url_sync)
 
 target_metadata = Base.metadata
 
