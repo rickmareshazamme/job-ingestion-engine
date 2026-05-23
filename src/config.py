@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     headless_crawl_interval_hours: int = 24
     max_requests_per_second: float = 2.0
     stale_after_missed_runs: int = 3
+    # When true, scheduled crawls only dispatch source_configs with
+    # source_type='shazamme_feed' — i.e. ZammeJobs ingests Shazamme tenant
+    # jobs only. Aggregators/ATS connectors stay registered but idle.
+    shazamme_only_ingestion: bool = True
 
     # Aggregator API keys (all optional — connector self-disables if missing)
     adzuna_app_id: str = ""

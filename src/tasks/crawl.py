@@ -130,6 +130,13 @@ def crawl_source(self, source_config_id: str):
             logger.info("Skipping source %s: inactive or not found", source_config_id)
             return {"status": "skipped", "reason": "inactive or not found"}
 
+        if settings.shazamme_only_ingestion and config.source_type != "shazamme_feed":
+            logger.info(
+                "Skipping source %s (%s): shazamme_only_ingestion=True",
+                source_config_id, config.source_type,
+            )
+            return {"status": "skipped", "reason": "shazamme_only_ingestion"}
+
         # Circuit breaker check
         if _is_circuit_open(session, config):
             logger.warning("Circuit breaker OPEN for source %s (%s). Skipping.", source_config_id, config.source_type)
@@ -688,9 +695,10 @@ def crawl_all_due_sources():
     """
     session = _get_sync_session()
     try:
-        configs = session.execute(
-            select(SourceConfig).where(SourceConfig.is_active == True)
-        ).scalars().all()
+        query = select(SourceConfig).where(SourceConfig.is_active == True)
+        if settings.shazamme_only_ingestion:
+            query = query.where(SourceConfig.source_type == "shazamme_feed")
+        configs = session.execute(query).scalars().all()
 
         dispatched = 0
         for config in configs:
@@ -703,7 +711,14 @@ def crawl_all_due_sources():
                     crawl_source.delay(str(config.id))
                     dispatched += 1
 
-        logger.info("crawl_all_due_sources: dispatched %d / %d source_configs", dispatched, len(configs))
-        return {"dispatched": dispatched, "total_configs": len(configs)}
+        logger.info(
+            "crawl_all_due_sources: dispatched %d / %d source_configs (shazamme_only=%s)",
+            dispatched, len(configs), settings.shazamme_only_ingestion,
+        )
+        return {
+            "dispatched": dispatched,
+            "total_configs": len(configs),
+            "shazamme_only": settings.shazamme_only_ingestion,
+        }
     finally:
         session.close()
