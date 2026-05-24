@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
@@ -188,8 +188,66 @@ async def sitemap_index(request: Request):
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap><loc>{base}/sitemap-jobs.xml</loc></sitemap>
   <sitemap><loc>{base}/sitemap-employers.xml</loc></sitemap>
+  <sitemap><loc>{base}/sitemap-landing.xml</loc></sitemap>
   <sitemap><loc>{base}/sitemap-static.xml</loc></sitemap>
 </sitemapindex>"""
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.get("/sitemap-landing.xml", response_class=Response)
+async def sitemap_landing(request: Request, session: AsyncSession = Depends(get_session)):
+    """Top role / city / role-in-city combos as their own sitemap so
+    search engines crawl every long-tail landing page we generate."""
+    from src.api.landing import slugify
+
+    base = str(request.base_url).rstrip("/")
+    urls: list[str] = []
+
+    # Top roles by job count — take the first category from each active job.
+    role_rows = (await session.execute(
+        select(func.unnest(Job.categories).label("cat"), func.count().label("n"))
+        .where(Job.status == "active")
+        .group_by("cat")
+        .order_by(func.count().desc())
+        .limit(150)
+    )).all()
+    role_slugs = []
+    for cat, n in role_rows:
+        if not cat or n < 5:
+            continue
+        s = slugify(cat)
+        if s and s not in role_slugs:
+            role_slugs.append(s)
+            urls.append(f"{base}/jobs/role/{s}")
+            urls.append(f"{base}/salaries/{s}")
+
+    # Top cities by job count.
+    city_rows = (await session.execute(
+        select(Job.location_city, func.count().label("n"))
+        .where(Job.status == "active", Job.location_city.isnot(None))
+        .group_by(Job.location_city)
+        .order_by(func.count().desc())
+        .limit(150)
+    )).all()
+    city_slugs = []
+    for city, n in city_rows:
+        if not city or n < 5:
+            continue
+        s = slugify(city)
+        if s and s not in city_slugs:
+            city_slugs.append(s)
+            urls.append(f"{base}/jobs/in/{s}")
+
+    # Cross-product top-N (capped to avoid explosion).
+    for r in role_slugs[:30]:
+        for c in city_slugs[:30]:
+            urls.append(f"{base}/jobs/{r}-in-{c}")
+
+    body = "\n".join(f"  <url><loc>{u}</loc></url>" for u in urls)
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{body}
+</urlset>"""
     return Response(content=xml, media_type="application/xml")
 
 

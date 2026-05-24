@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ theme }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Open jobs — ZammeJobs</title>
+<style>
+:root { --bg: #ffffff; --fg: #111827; --muted: #6b7280; --border: #e5e7eb; --accent: #e91e89; --card-hover: #f9fafb; }
+:root[data-theme="dark"] { --bg: #0f1015; --fg: #f5f5f7; --muted: #9ca3af; --border: #2a2d36; --accent: #e91e89; --card-hover: #1a1c24; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] { --bg: #0f1015; --fg: #f5f5f7; --muted: #9ca3af; --border: #2a2d36; --accent: #e91e89; --card-hover: #1a1c24; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif; font-size: 14px; line-height: 1.45; }
+.zj-wrap { padding: 12px; }
+.zj-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+.zj-brand { color: var(--accent); font-weight: 600; text-decoration: none; }
+.zj-list { display: flex; flex-direction: column; gap: 8px; }
+.zj-card { display: block; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--fg); transition: background 120ms, border-color 120ms; }
+.zj-card:hover { background: var(--card-hover); border-color: var(--accent); }
+.zj-title { font-weight: 600; margin-bottom: 2px; }
+.zj-meta { color: var(--muted); font-size: 12px; }
+.zj-foot { margin-top: 10px; text-align: center; font-size: 12px; }
+.zj-foot a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="zj-wrap">
+  <div class="zj-head">
+    <span>{{ jobs|length }} open role{{ "s" if jobs|length != 1 else "" }}</span>
+    <a href="https://www.zammejobs.com/?utm_source=embed&utm_medium=widget" target="_blank" rel="noopener" class="zj-brand">Powered by ZammeJobs</a>
+  </div>
+  <div class="zj-list">
+    {% for j in jobs %}
+    <a href="https://www.zammejobs.com/jobs/{{ j.id }}?utm_source=embed&utm_medium=widget" target="_blank" rel="noopener" class="zj-card">
+      <div class="zj-title">{{ j.title }}</div>
+      <div class="zj-meta">
+        {{ j.employer_name }}
+        {% if j.location.city or j.location.country %} · {{ j.location.city or j.location.country }}{% endif %}
+        {% if j.is_remote %} · Remote{% endif %}
+        {% if j.salary.min %} · {{ j.salary.currency or "USD" }} {{ "{:,}".format(j.salary.min) }}{% if j.salary.max and j.salary.max != j.salary.min %}–{{ "{:,}".format(j.salary.max) }}{% endif %}{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <div class="zj-foot">
+    <a href="{{ more_url }}?utm_source=embed&utm_medium=widget" target="_blank" rel="noopener">See more jobs →</a>
+  </div>
+</div>
+<script>
+function postHeight(){
+  try {
+    var h = document.documentElement.scrollHeight;
+    parent.postMessage({ zjHeight: h }, '*');
+  } catch(e) {}
+}
+window.addEventListener('load', postHeight);
+new ResizeObserver(postHeight).observe(document.body);
+</script>
+</body>
+</html>

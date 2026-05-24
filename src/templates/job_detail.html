@@ -114,6 +114,44 @@
             </a>
             {% endif %}
 
+            {# Quick Answer block — sits above the description so AI extractors
+               (ChatGPT, Perplexity, Claude) pull a clean summary without
+               wading through Word-pasted HTML. Mirrors the Featured Snippet
+               pattern Google rewards. #}
+            <aside class="quick-answer" aria-label="Quick answer about this role">
+                <h2 class="qa-heading">About this role</h2>
+                <p class="qa-summary">
+                    {{ job.title }} at <strong>{{ job.employer_name }}</strong>{% if job.location.city %} in {{ job.location.city }}{% if job.location.country %}, {{ job.location.country }}{% endif %}{% elif job.location.country %} in {{ job.location.country }}{% endif %}.{% if job.is_remote %} {{ (job.remote_type or "Remote") | capitalize }}-friendly.{% endif %}{% if job.salary.min %} Pays {{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %}–{{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} per {{ job.salary.period | lower }}{% endif %}.{% endif %}{% if job.employment_type %} {{ job.employment_type | replace("_", " ") | capitalize }}.{% endif %}
+                </p>
+                <dl class="qa-grid">
+                    {% if job.salary.min %}
+                    <div class="qa-cell"><dt>Salary</dt><dd>{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max and job.salary.max != job.salary.min %}–{{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} / {{ job.salary.period | lower }}{% endif %}</dd></div>
+                    {% endif %}
+                    <div class="qa-cell"><dt>Location</dt><dd>{% if job.is_remote %}Remote{% if job.location.city %} ({{ job.location.city }}){% endif %}{% else %}{{ job.location.city or job.location.country or "—" }}{% endif %}</dd></div>
+                    {% if job.employment_type %}
+                    <div class="qa-cell"><dt>Type</dt><dd>{{ job.employment_type | replace("_", " ") | capitalize }}</dd></div>
+                    {% endif %}
+                    {% if job.seniority %}
+                    <div class="qa-cell"><dt>Seniority</dt><dd>{{ job.seniority | replace("_", " ") | capitalize }}</dd></div>
+                    {% endif %}
+                    <div class="qa-cell"><dt>Apply via</dt><dd>{{ job.employer_name }}'s site (direct)</dd></div>
+                </dl>
+                {% if job.categories %}
+                <div class="qa-skills">
+                    <span class="qa-skills-label">Skills:</span>
+                    {% for cat in job.categories[:8] %}<a class="qa-skill" href="/jobs/role/{{ cat | lower | replace(' ', '-') }}">{{ cat }}</a>{% endfor %}
+                </div>
+                {% endif %}
+                <p class="qa-ask">
+                    <strong>Ask AI:</strong>
+                    <a href="https://www.perplexity.ai/?q=Tell+me+more+about+the+{{ job.title | urlencode }}+role+at+{{ job.employer_name | urlencode }}+listed+on+ZammeJobs+{{ canonical_url | urlencode }}" target="_blank" rel="noopener noreferrer">Perplexity</a>
+                    ·
+                    <a href="https://chatgpt.com/?q=Summarise+this+job+for+me%3A+{{ canonical_url | urlencode }}" target="_blank" rel="noopener noreferrer">ChatGPT</a>
+                    ·
+                    <a href="https://claude.ai/new?q=Summarise+this+job%3A+{{ canonical_url | urlencode }}" target="_blank" rel="noopener noreferrer">Claude</a>
+                </p>
+            </aside>
+
             <div class="job-description">
                 {{ job.description_html | safe if job.description_html else job.description_text or "<p style='color: var(--color-text-muted);'>No description available. Visit the employer's career page for details.</p>" }}
             </div>

@@ -600,7 +600,10 @@ async def job_detail_page(
     try:
         uid = UUID(job_id)
     except ValueError:
-        return HTMLResponse("<h1>Invalid job ID</h1>", status_code=400)
+        # Not a UUID — delegate to the long-tail landing handler so URLs
+        # like /jobs/sales-engineer-in-sydney render the role+city page.
+        from src.api.landing import role_in_city_landing
+        return await role_in_city_landing(request, job_id, session)
 
     result = await session.execute(select(Job).where(Job.id == uid))
     job = result.scalar_one_or_none()

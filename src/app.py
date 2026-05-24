@@ -7,16 +7,20 @@ from src.api.admin import router as admin_router
 from src.api.ai import router as ai_router
 from src.api.country import router as country_router
 from src.api.data import router as data_router
+from src.api.embed import router as embed_router
 from src.api.employer_register import router as employer_register_router
 from src.api.feed_inbound import router as feed_inbound_router
 from src.api.employers import router as employers_router
 from src.api.frontend import router as frontend_router
 from src.api.jobs import router as jobs_router
+from src.api.landing import router as landing_router
 from src.api.legal import router as legal_router
 from src.api.linkedin_feed import router as linkedin_feed_router
 from src.api.map_view import router as map_router
+from src.api.salaries import router as salaries_router
 from src.api.sitemap import router as sitemap_router
 from src.api.stats import router as stats_router
+from src.api.status import router as status_router
 
 # OpenAPI tag descriptions are read by ChatGPT's GPT Action importer and by
 # Anthropic's Claude tool-builder UI. Keep them dense and verb-forward.
@@ -161,6 +165,13 @@ app.include_router(map_router)
 app.include_router(legal_router)
 app.include_router(linkedin_feed_router)
 app.include_router(admin_router)
+# Landing + salary + status + embed must be registered BEFORE the
+# frontend router so the more-specific paths (/jobs/role/..., /salaries/...,
+# /status, /embed/...) win over the frontend's catch-all /jobs/{job_id}.
+app.include_router(landing_router)
+app.include_router(salaries_router)
+app.include_router(status_router)
+app.include_router(embed_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)

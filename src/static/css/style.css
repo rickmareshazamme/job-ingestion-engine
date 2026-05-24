@@ -1308,3 +1308,58 @@ a.emp-stat-link:hover { background: var(--color-bg-hover); color: var(--color-ac
 .faq-item summary::before { content: "+"; display: inline-block; width: 1.2em; color: var(--color-accent); font-weight: 700; }
 .faq-item[open] summary::before { content: "−"; }
 .faq-answer { margin-top: 0.5rem; padding-left: 1.2em; color: var(--color-text-muted); line-height: 1.55; }
+
+/* Long-tail landing pages (role / city / role+city) and salary pages share
+   the same head + intro layout. */
+.landing, .salary-page, .status-page { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.landing-head { margin: 1rem 0 2rem; }
+.landing-head h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); margin: 0 0 0.5rem; line-height: 1.15; }
+.landing-sub { color: var(--color-text-muted); font-size: 1.05rem; margin: 0; }
+.landing-jobs { margin: 1.5rem 0; }
+.landing-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.landing-list .job-card { padding: 1rem 1.25rem; }
+.job-card-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.35rem; }
+.job-card-meta { color: var(--color-text-muted); font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.job-card-emp { color: var(--color-text); font-weight: 500; }
+.badge-remote { background: rgba(34,197,94,0.12); color: #22c55e; padding: 1px 7px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+.job-card-salary { color: var(--color-salary); font-weight: 500; }
+.landing-more { margin-top: 1rem; color: var(--color-text-muted); font-size: 0.9rem; }
+.landing-more a { color: var(--color-accent); }
+
+/* Salary benchmark page */
+.salary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 1.5rem 0 2rem; }
+.salary-stat { padding: 1.25rem; border: 1px solid var(--color-border); border-radius: 12px; }
+.salary-label { color: var(--color-text-muted); font-size: 0.85rem; font-weight: 500; margin-bottom: 0.4rem; }
+.salary-value { font-size: 1.7rem; font-weight: 700; color: var(--color-text); margin-bottom: 0.15rem; }
+.salary-period { color: var(--color-text-muted); font-size: 0.85rem; }
+.salary-country { margin: 2rem 0; }
+.salary-country h2 { font-size: 1.15rem; margin: 0 0 0.75rem; }
+.salary-table { width: 100%; border-collapse: collapse; }
+.salary-table th, .salary-table td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--color-border); }
+.salary-table th { font-weight: 600; color: var(--color-text-muted); font-size: 0.85rem; }
+.salary-cta { margin: 2rem 0; }
+.salary-license { color: var(--color-text-muted); font-size: 0.8rem; margin-top: 2rem; }
+.salary-license a { color: var(--color-accent); }
+
+/* Quick Answer block on job_detail — featured-snippet shape so AI
+   extractors and Google rich results pick a clean summary above the
+   noisy pasted-in Word HTML. */
+.quick-answer {
+    margin: 1.5rem 0 2rem;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+}
+.qa-heading { font-size: 1rem; font-weight: 600; margin: 0 0 0.6rem; color: var(--color-text); letter-spacing: -0.01em; }
+.qa-summary { color: var(--color-text-secondary); margin: 0 0 1rem; line-height: 1.6; }
+.qa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin: 0 0 1rem; }
+.qa-cell { padding: 0.55rem 0.75rem; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-sm); background: var(--color-bg); }
+.qa-cell dt { color: var(--color-text-muted); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.2rem; }
+.qa-cell dd { color: var(--color-text); font-size: 0.9rem; margin: 0; line-height: 1.3; }
+.qa-skills { margin: 0.5rem 0 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.qa-skills-label { color: var(--color-text-muted); font-size: 0.8rem; margin-right: 0.25rem; }
+.qa-skill { padding: 3px 9px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border-subtle); font-size: 0.78rem; color: var(--color-text-secondary); text-decoration: none; }
+.qa-skill:hover { color: var(--color-accent); border-color: var(--color-accent); }
+.qa-ask { margin: 0; color: var(--color-text-muted); font-size: 0.82rem; }
+.qa-ask a { color: var(--color-accent); }

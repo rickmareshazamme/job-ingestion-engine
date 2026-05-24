@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block og_meta %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ZammeJobs">
+<meta property="og:title" content="{{ h1 }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ h1 }}">
+<meta name="twitter:description" content="{{ description }}">
+{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{{ json_ld | safe }}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="landing">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            {% for name, url in breadcrumbs %}
+            <li{% if loop.last %} aria-current="page"{% endif %}>
+                {% if loop.last %}{{ name }}{% else %}<a href="{{ url }}">{{ name }}</a>{% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </nav>
+
+    <header class="landing-head">
+        <h1>{{ h1 }}</h1>
+        <p class="landing-sub">{{ subhead }}</p>
+    </header>
+
+    <section class="landing-jobs" aria-label="Job listings">
+        <div class="landing-list">
+            {% for j in jobs %}
+            <a href="/jobs/{{ j.id }}" class="job-card">
+                <div class="job-card-title">{{ j.title }}</div>
+                <div class="job-card-meta">
+                    <span class="job-card-emp">{{ j.employer_name }}</span>
+                    {% if j.location.city or j.location.country %}
+                    <span class="dot-sep">&middot;</span>
+                    <span>{{ j.location.city or j.location.country }}</span>
+                    {% endif %}
+                    {% if j.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+                    {% if j.salary.min %}
+                    <span class="dot-sep">&middot;</span>
+                    <span class="job-card-salary">{{ j.salary.currency or "USD" }} {{ "{:,}".format(j.salary.min) }}{% if j.salary.max and j.salary.max != j.salary.min %}–{{ "{:,}".format(j.salary.max) }}{% endif %}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% if total > jobs|length %}
+        <p class="landing-more">Showing {{ jobs|length }} of {{ "{:,}".format(total) }} — <a href="/search?q={{ h1 }}">refine your search</a> to see them all.</p>
+        {% endif %}
+    </section>
+
+    <section class="job-faqs" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">Frequently asked questions</h2>
+        <div class="faq-list">
+            {% for f in faqs %}
+            <details class="faq-item">
+                <summary>{{ f.q }}</summary>
+                <div class="faq-answer">{{ f.a }}</div>
+            </details>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block og_meta %}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="ZammeJobs">
+<meta property="og:title" content="{{ role }} salary benchmark">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ role }} salary benchmark">
+<meta name="twitter:description" content="{{ description }}">
+{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">
+{{ json_ld | safe }}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="salary-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li><a href="/search">Jobs</a></li>
+            <li aria-current="page">{{ role }} salary</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head">
+        <h1>{{ role }} salary benchmark</h1>
+        <p class="landing-sub">Based on <strong>{{ "{:,}".format(sample_size) }}</strong> live {{ role }} roles indexed by ZammeJobs. Updated every 12 hours.</p>
+    </header>
+
+    <section class="salary-grid" aria-label="Salary statistics">
+        <div class="salary-stat">
+            <div class="salary-label">Median</div>
+            <div class="salary-value">{{ currency }} {{ "{:,}".format(median) }}</div>
+            <div class="salary-period">per {{ period }}</div>
+        </div>
+        <div class="salary-stat">
+            <div class="salary-label">75th percentile</div>
+            <div class="salary-value">{{ currency }} {{ "{:,}".format(p75) }}</div>
+            <div class="salary-period">per {{ period }}</div>
+        </div>
+        <div class="salary-stat">
+            <div class="salary-label">Range</div>
+            <div class="salary-value">{{ currency }} {{ "{:,}".format(min) }} – {{ "{:,}".format(max) }}</div>
+            <div class="salary-period">per {{ period }}</div>
+        </div>
+    </section>
+
+    {% if by_country %}
+    <section class="salary-country" aria-label="Median by country">
+        <h2>Median {{ role }} salary by country</h2>
+        <table class="salary-table">
+            <thead>
+                <tr><th>Country</th><th>Listings</th><th>Median ({{ currency }})</th></tr>
+            </thead>
+            <tbody>
+                {% for c in by_country %}
+                <tr>
+                    <td>{{ c.country }}</td>
+                    <td>{{ c.n }}</td>
+                    <td>{{ "{:,}".format(c.median) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <section class="salary-cta">
+        <a href="/jobs/role/{{ role_slug }}" class="apply-button apply-button-top">View {{ "{:,}".format(sample_size) }} open {{ role }} roles</a>
+    </section>
+
+    <section class="job-faqs" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">Frequently asked questions</h2>
+        <div class="faq-list">
+            {% for f in faqs %}
+            <details class="faq-item">
+                <summary>{{ f.q }}</summary>
+                <div class="faq-answer">{{ f.a }}</div>
+            </details>
+            {% endfor %}
+        </div>
+    </section>
+
+    <p class="salary-license">Data licensed <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC-BY-4.0</a>. Attribution: ZammeJobs ({{ canonical_url }}).</p>
+</div>
+{% endblock %}

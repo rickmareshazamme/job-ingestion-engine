@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block content %}
+<div class="status-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li aria-current="page">Status</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head">
+        <h1>Index status</h1>
+        <p class="landing-sub">Live freshness of the ZammeJobs catalog. Updated on every page load.</p>
+    </header>
+
+    <section class="salary-grid">
+        <div class="salary-stat">
+            <div class="salary-label">Active jobs</div>
+            <div class="salary-value">{{ "{:,}".format(data.jobs.active) }}</div>
+            <div class="salary-period">across {{ data.sources.active }} live sources</div>
+        </div>
+        <div class="salary-stat">
+            <div class="salary-label">Verified in 24h</div>
+            <div class="salary-value">{{ data.jobs.freshness_pct_24h }}%</div>
+            <div class="salary-period">{{ "{:,}".format(data.jobs.verified_in_24h) }} jobs touched</div>
+        </div>
+        <div class="salary-stat">
+            <div class="salary-label">New in 7 days</div>
+            <div class="salary-value">{{ "{:,}".format(data.jobs.new_in_7d) }}</div>
+            <div class="salary-period">first-seen by ZammeJobs</div>
+        </div>
+    </section>
+
+    {% if data.coverage.by_country_top %}
+    <section class="salary-country">
+        <h2>Top countries by active openings</h2>
+        <table class="salary-table">
+            <thead><tr><th>Country</th><th>Active jobs</th></tr></thead>
+            <tbody>
+                {% for c in data.coverage.by_country_top %}
+                <tr><td>{{ c.country }}</td><td>{{ "{:,}".format(c.active) }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <section class="salary-cta" style="margin-top: 2rem;">
+        <p style="color: var(--color-text-muted); font-size: 0.9rem;">
+            Service version <code>{{ data.version }}</code> · Last crawl
+            <code>{{ data.sources.last_crawl_at or "n/a" }}</code> ·
+            Machine-readable: <a href="/status.json">/status.json</a>
+        </p>
+    </section>
+</div>
+{% endblock %}
