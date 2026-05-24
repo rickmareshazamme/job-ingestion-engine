@@ -104,22 +104,29 @@ class ShazammeConnector(BaseConnector):
         return tmp_path
 
     def _parse_stream(self, path: str):
-        """iterparse the file, yield RawJob per <job>, free each element after use."""
-        # The file is UTF-16 LE — ET.iterparse handles BOM/encoding from the
-        # XML prolog automatically when given a binary file handle. If the
-        # prolog declares utf-8 but the file is actually utf-16 (some Shazamme
-        # exports do this), we re-decode + re-encode as a stream wrapper.
+        """iterparse the file, yield RawJob per <job>, free each element after use.
+
+        Uses lxml in recover mode so malformed bytes mid-stream (control
+        chars, stray entities, broken CDATA from the producer side) don't
+        abort the whole import — lxml logs the offence and resyncs at the
+        next valid element. Shazamme exports periodically contain such
+        artifacts; stdlib ElementTree is too strict and 26K good jobs get
+        dropped on the floor when one is bad.
+        """
+        from lxml import etree as LET
+
         with open(path, "rb") as fh:
             head = fh.read(4)
             fh.seek(0)
             if head[:2] in (b"\xff\xfe", b"\xfe\xff") or (len(head) >= 2 and head[1] == 0):
-                # UTF-16 — wrap with a converting reader that emits valid utf-8
                 src = _Utf16ToUtf8Reader(fh)
             else:
                 src = fh
 
-            for event, el in ET.iterparse(src, events=("end",)):
-                if el.tag != "job":
+            parser = LET.XMLParser(recover=True, huge_tree=True, encoding="utf-8")
+            for event, el in LET.iterparse(src, events=("end",), parser=parser):
+                tag = LET.QName(el.tag).localname if isinstance(el.tag, str) else el.tag
+                if tag != "job":
                     continue
                 try:
                     raw = self._element_to_rawjob(el)
@@ -127,8 +134,11 @@ class ShazammeConnector(BaseConnector):
                         yield raw
                 except Exception as e:
                     logger.warning("Shazamme job parse failed: %s", str(e)[:120])
-                # Free the element so memory stays bounded
                 el.clear()
+                # Drop the element from the parent chain so RSS stays
+                # bounded across the whole stream.
+                while el.getprevious() is not None:
+                    del el.getparent()[0]
 
     def _element_to_rawjob(self, el: ET.Element) -> Optional[RawJob]:
         def text(tag: str) -> str:
