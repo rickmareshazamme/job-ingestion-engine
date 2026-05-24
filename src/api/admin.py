@@ -40,6 +40,22 @@ def import_shazamme(x_admin_token: str | None = Header(default=None)):
     return {"status": "dispatched", "pid": proc.pid, "log_path": log_path}
 
 
+@router.post("/indexnow-bulk")
+def indexnow_bulk(x_admin_token: str | None = Header(default=None)):
+    """Bulk-submit every active job URL to IndexNow (Bing/Yandex/Naver/Seznam).
+    Spawns scripts.indexnow_bulk_submit in the background."""
+    _check_token(x_admin_token)
+    log_path = "/tmp/indexnow_bulk.log"
+    proc = subprocess.Popen(
+        ["python3", "-m", "scripts.indexnow_bulk_submit"],
+        stdout=open(log_path, "ab"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        env=os.environ.copy(),
+    )
+    return {"status": "dispatched", "pid": proc.pid, "log_path": log_path}
+
+
 @router.get("/shazamme-status")
 async def shazamme_status(session: AsyncSession = Depends(get_session)):
     """Snapshot of the Shazamme ingestion state. Read-only, no auth — same

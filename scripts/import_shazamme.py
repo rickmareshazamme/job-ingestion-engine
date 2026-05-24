@@ -104,13 +104,20 @@ async def main():
         except Exception as e:
             logger.warning("Post-import visibility sync failed: %s", str(e)[:200])
 
-    # Best-effort AI ping for new URLs
-    if new_urls:
-        try:
-            from src.indexing.indexnow import submit_urls as indexnow_submit
-            await indexnow_submit(new_urls[:10000])  # IndexNow batch cap
-        except Exception as e:
-            logger.warning("IndexNow dispatch failed: %s", str(e)[:120])
+    # IndexNow: submit every active job URL (Bing / Yandex / Naver / Seznam
+    # + ChatGPT search index, which proxies Bing). Idempotent — re-submission
+    # is allowed and just refreshes the lastmod hint.
+    try:
+        import subprocess
+        subprocess.Popen(
+            ["python3", "-m", "scripts.indexnow_bulk_submit"],
+            stdout=open("/tmp/indexnow_bulk.log", "ab"),
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        logger.info("Launched indexnow_bulk_submit in background")
+    except Exception as e:
+        logger.warning("IndexNow dispatch failed: %s", str(e)[:120])
 
 
 if __name__ == "__main__":

@@ -35,8 +35,11 @@ class Settings(BaseSettings):
     bundesagentur_token: str = "bf3a8b6e-7c8e-4e19-a3a8-1c4c2c4c2c4c"
 
     # Indexing
-    indexnow_key: str = ""
-    site_domain: str = "zammejobs.com"
+    # IndexNow keys are deliberately public — they're verified by hosting
+    # them at https://<host>/indexnow-key.txt. Default value baked in so
+    # bulk submit works out of the box; rotate via env if desired.
+    indexnow_key: str = "f3a7c2e8b9d14f5e8a6c3b7d2e9f4a1c5b8e2d7f9a3c6b1e4d8f2a5c7b3e9d6"
+    site_domain: str = "www.zammejobs.com"
     google_sa_file: str = ""
 
     # LinkedIn XML job feed

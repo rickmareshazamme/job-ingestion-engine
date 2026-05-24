@@ -1,7 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}{{ job.title }} at {{ job.employer_name }} — ZammeJobs{% endblock %}
-{% block meta_description %}{{ job.title }} at {{ job.employer_name }}. {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country }}. {% if job.salary.min %}{{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}-{{ "{:,}".format(job.salary.max) }}{% endif %}. {% endif %}Apply now.{% endblock %}
+{% block title %}{{ job.title }} at {{ job.employer_name }}{% if job.location.city %} — {{ job.location.city }}{% if job.location.state %}, {{ job.location.state }}{% endif %}{% elif job.location.country %} — {{ job.location.country }}{% endif %}{% if job.is_remote %} (Remote){% endif %} | ZammeJobs{% endblock %}
+{% block meta_description %}Apply for {{ job.title }} at {{ job.employer_name }}{% if job.location.city or job.location.country %} in {{ job.location.city or "" }}{% if job.location.city and job.location.country %}, {% endif %}{{ job.location.country or "" }}{% endif %}{% if job.is_remote %} ({{ (job.remote_type or "remote") | capitalize }}){% endif %}.{% if job.salary.min %} {{ job.salary.currency or "USD" }} {{ "{:,}".format(job.salary.min) }}{% if job.salary.max %}–{{ "{:,}".format(job.salary.max) }}{% endif %}{% if job.salary.period %} per {{ job.salary.period | lower }}{% endif %}.{% endif %}{% if job.employment_type %} {{ job.employment_type | replace("_", " ") | lower | capitalize }}.{% endif %} Apply direct on the employer's site via ZammeJobs.{% endblock %}
+
+{% block og_meta %}
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="ZammeJobs">
+<meta property="og:title" content="{{ job.title }} at {{ job.employer_name }}">
+<meta property="og:description" content="{{ self.meta_description() }}">
+<meta property="og:url" content="{{ canonical_url }}">
+{% if job.employer_logo_url %}<meta property="og:image" content="{{ job.employer_logo_url }}">{% endif %}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ job.title }} at {{ job.employer_name }}">
+<meta name="twitter:description" content="{{ self.meta_description() }}">
+{% if job.employer_logo_url %}<meta name="twitter:image" content="{{ job.employer_logo_url }}">{% endif %}
+<meta name="article:published_time" content="{{ job.date_posted }}">
+<meta name="article:section" content="Jobs">
+{% if job.categories %}{% for cat in job.categories %}<meta name="article:tag" content="{{ cat }}">{% endfor %}{% endif %}
+{% endblock %}
 
 {% block head_extra %}
 <script type="application/ld+json">
@@ -11,10 +27,14 @@
 
 {% block content %}
 <div class="job-detail">
-    <a href="/search" class="back-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7"/></svg>
-        Back to search
-    </a>
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li><a href="/search">Jobs</a></li>
+            <li><a href="/search?employer={{ job.employer_domain }}">{{ job.employer_name }}</a></li>
+            <li aria-current="page">{{ job.title }}</li>
+        </ol>
+    </nav>
 
     <div class="job-detail-grid">
         <article class="job-detail-main">
@@ -89,7 +109,7 @@
 
             {% if job.source_url %}
             <a href="/apply/{{ job.id }}" target="_blank" rel="noopener" class="apply-button apply-button-top">
-                Apply on {{ job.ats_platform | capitalize if job.ats_platform else "employer site" }}
+                Apply direct
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
             </a>
             {% endif %}
@@ -98,9 +118,23 @@
                 {{ job.description_html | safe if job.description_html else job.description_text or "<p style='color: var(--color-text-muted);'>No description available. Visit the employer's career page for details.</p>" }}
             </div>
 
+            {% if faqs %}
+            <section class="job-faqs" aria-labelledby="faq-heading">
+                <h2 id="faq-heading">Frequently asked questions</h2>
+                <div class="faq-list">
+                    {% for f in faqs %}
+                    <details class="faq-item">
+                        <summary>{{ f.q }}</summary>
+                        <div class="faq-answer">{{ f.a }}</div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
             {% if job.source_url %}
             <a href="/apply/{{ job.id }}" target="_blank" rel="noopener" class="apply-button">
-                Apply on {{ job.ats_platform | capitalize if job.ats_platform else "employer site" }}
+                Apply direct
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
             </a>
             {% endif %}

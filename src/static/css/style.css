@@ -1274,3 +1274,22 @@ a.emp-stat-link:hover { background: var(--color-bg-hover); color: var(--color-ac
 .tag, .stat-item, .hero-badge, .meta-item, .applied-filter {
     transition: background-color var(--transition), border-color var(--transition), color var(--transition);
 }
+
+/* Breadcrumbs (job detail + future pages) */
+.breadcrumbs { font-size: 0.85rem; margin-bottom: 1rem; color: var(--color-text-muted); }
+.breadcrumbs ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.breadcrumbs li + li::before { content: "›"; padding-right: 0.4rem; color: var(--color-text-muted); }
+.breadcrumbs a { color: var(--color-text-muted); text-decoration: none; }
+.breadcrumbs a:hover { color: var(--color-accent); }
+.breadcrumbs li[aria-current="page"] { color: var(--color-text); }
+
+/* Job detail FAQs (FAQPage schema + visible answers for AEO/GEO) */
+.job-faqs { margin: 2.5rem 0 1.5rem; padding: 1.5rem; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-soft, transparent); }
+.job-faqs h2 { font-size: 1.15rem; margin: 0 0 1rem; }
+.faq-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.faq-item { border: 1px solid var(--color-border); border-radius: 8px; padding: 0.75rem 1rem; }
+.faq-item summary { cursor: pointer; font-weight: 600; list-style: none; outline: none; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::before { content: "+"; display: inline-block; width: 1.2em; color: var(--color-accent); font-weight: 700; }
+.faq-item[open] summary::before { content: "−"; }
+.faq-answer { margin-top: 0.5rem; padding-left: 1.2em; color: var(--color-text-muted); line-height: 1.55; }

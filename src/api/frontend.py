@@ -95,23 +95,130 @@ def _employer_fallback_url(job: Job, employer: Employer | None) -> str:
     return "/"
 
 
-def _build_json_ld(job: Job) -> str:
-    """Build JobPosting JSON-LD for a job detail page."""
-    schema = {
-        "@context": "https://schema.org",
+def _canonical_url(path: str) -> str:
+    """Build a canonical https://www.zammejobs.com URL. FastAPI's request.url
+    sees the upstream HTTP scheme behind Railway's edge so we force https +
+    the site_domain rather than reading the request host."""
+    from src.config import settings
+    host = settings.site_domain or "www.zammejobs.com"
+    if not host.startswith("www.") and host == "zammejobs.com":
+        host = "www.zammejobs.com"
+    return f"https://{host}{path}"
+
+
+def _build_faqs(job: Job, employer: Employer | None = None) -> list[dict]:
+    """Auto-generate FAQ Q&A pairs from job fields. Used both for FAQPage
+    JSON-LD (helps Google rich results + AI answer engines) and rendered
+    as a visible section on the page. Only includes Qs we can actually
+    answer from the data — empty/unknown fields are skipped."""
+    faqs: list[dict] = []
+    title = job.title
+    employer_name = job.employer_name
+
+    faqs.append({
+        "q": f"Who is hiring for the {title} role?",
+        "a": (
+            f"{employer_name} is hiring for the {title} position"
+            + (f", a {employer.ats_platform.capitalize()} client" if employer and employer.ats_platform == "shazamme" else "")
+            + ". Apply directly on the employer's career site."
+        ),
+    })
+
+    if job.location_city or job.location_country:
+        loc_parts = [p for p in (job.location_city, job.location_state, job.location_country) if p]
+        loc_str = ", ".join(loc_parts)
+        remote_note = ""
+        if job.is_remote:
+            remote_note = f" The role is {job.remote_type or 'remote'}-friendly."
+        faqs.append({
+            "q": f"Where is the {title} job located?",
+            "a": f"The {title} role with {employer_name} is based in {loc_str}.{remote_note}",
+        })
+
+    if job.is_remote:
+        faqs.append({
+            "q": f"Is the {title} role remote?",
+            "a": (
+                f"Yes — the {title} position at {employer_name} is "
+                f"{job.remote_type or 'remote'}. "
+                + (f"Candidates based in {job.location_country} are preferred." if job.location_country else "")
+            ).strip(),
+        })
+
+    if job.salary_min or job.salary_max:
+        currency = job.salary_currency or "USD"
+        period = (job.salary_period or "year").lower()
+        if job.salary_min and job.salary_max and job.salary_min != job.salary_max:
+            band = f"{currency} {job.salary_min:,}–{job.salary_max:,} per {period}"
+        elif job.salary_max:
+            band = f"up to {currency} {job.salary_max:,} per {period}"
+        else:
+            band = f"from {currency} {job.salary_min:,} per {period}"
+        faqs.append({
+            "q": f"What does the {title} role pay?",
+            "a": f"{employer_name} lists the {title} role at {band}.",
+        })
+
+    if job.employment_type:
+        et = job.employment_type.replace("_", " ").lower()
+        faqs.append({
+            "q": f"Is the {title} role full-time or contract?",
+            "a": f"This is a {et} position at {employer_name}.",
+        })
+
+    if job.seniority:
+        sen = job.seniority.lower()
+        faqs.append({
+            "q": f"What experience level is the {title} role?",
+            "a": f"The {title} position is aimed at {sen}-level candidates.",
+        })
+
+    faqs.append({
+        "q": f"How do I apply for the {title} role at {employer_name}?",
+        "a": (
+            f"Apply directly on {employer_name}'s career page via the Apply button on this listing. "
+            "ZammeJobs links straight through to the employer's ATS — no third-party form, no resume database."
+        ),
+    })
+
+    if job.date_posted:
+        date_str = job.date_posted.strftime("%B %d, %Y") if hasattr(job.date_posted, "strftime") else str(job.date_posted)[:10]
+        faqs.append({
+            "q": f"When was the {title} job posted?",
+            "a": f"This role was posted on {date_str}.",
+        })
+
+    return faqs
+
+
+def _build_json_ld(job: Job, employer: Employer | None = None) -> str:
+    """Build a graph of JSON-LD nodes for a job detail page:
+
+      - JobPosting (Google for Jobs, structured search results)
+      - Organization (hiring company)
+      - BreadcrumbList (search hierarchy for crawlers + rich results)
+      - FAQPage (AEO / GEO — answer engines + Google FAQ rich result)
+
+    Returned as a single @graph document so a single <script> tag covers
+    all four entities cleanly. Empty optional fields are omitted to keep
+    the JSON-LD lean and avoid Google validator warnings.
+    """
+    job_canonical = _canonical_url(f"/jobs/{job.id}")
+    description = job.description_html or job.description_text or f"{job.title} at {job.employer_name}."
+
+    job_posting: dict = {
         "@type": "JobPosting",
+        "@id": f"{job_canonical}#jobposting",
         "title": job.title,
-        "description": job.description_html or job.description_text or "",
-        "datePosted": str(job.date_posted)[:10] if job.date_posted else "",
+        "description": description,
+        "url": job_canonical,
         "identifier": {
             "@type": "PropertyValue",
             "name": job.employer_name,
             "value": str(job.id),
         },
         "hiringOrganization": {
-            "@type": "Organization",
-            "name": job.employer_name,
-            "sameAs": f"https://{job.employer_domain}" if job.employer_domain else "",
+            "@id": f"{job_canonical}#org",
         },
         "jobLocation": {
             "@type": "Place",
@@ -126,11 +233,15 @@ def _build_json_ld(job: Job) -> str:
         "directApply": True,
     }
 
-    if job.source_url:
-        schema["url"] = job.source_url
-
+    if job.date_posted:
+        job_posting["datePosted"] = str(job.date_posted)[:10]
     if job.date_expires:
-        schema["validThrough"] = str(job.date_expires)[:10]
+        job_posting["validThrough"] = str(job.date_expires)[:10]
+    if job.source_url:
+        job_posting["applicantContact"] = {
+            "@type": "ContactPoint",
+            "url": job.source_url,
+        }
 
     if job.salary_min or job.salary_max:
         value = {"@type": "QuantitativeValue", "unitText": (job.salary_period or "YEAR").upper()}
@@ -138,29 +249,26 @@ def _build_json_ld(job: Job) -> str:
             value["minValue"] = job.salary_min
         if job.salary_max:
             value["maxValue"] = job.salary_max
-        schema["baseSalary"] = {
+        job_posting["baseSalary"] = {
             "@type": "MonetaryAmount",
             "currency": job.salary_currency or "USD",
             "value": value,
         }
 
     if job.is_remote:
-        schema["jobLocationType"] = "TELECOMMUTE"
+        job_posting["jobLocationType"] = "TELECOMMUTE"
         if job.location_country:
-            schema["applicantLocationRequirements"] = {
+            job_posting["applicantLocationRequirements"] = {
                 "@type": "Country",
                 "name": job.location_country,
             }
 
-    if job.employer_logo_url:
-        schema["hiringOrganization"]["logo"] = job.employer_logo_url
-
     if job.categories:
-        schema["industry"] = job.categories[0]
-        schema["occupationalCategory"] = ", ".join(job.categories[:3])
+        job_posting["industry"] = job.categories[0]
+        job_posting["occupationalCategory"] = ", ".join(job.categories[:3])
 
     if job.seniority:
-        schema["experienceRequirements"] = {
+        job_posting["experienceRequirements"] = {
             "@type": "OccupationalExperienceRequirements",
             "monthsOfExperience": {
                 "intern": 0, "junior": 0, "mid": 24, "senior": 60,
@@ -168,7 +276,49 @@ def _build_json_ld(job: Job) -> str:
             }.get(job.seniority.lower() if job.seniority else "", 0),
         }
 
-    return json.dumps(schema, indent=2, ensure_ascii=False)
+    org: dict = {
+        "@type": "Organization",
+        "@id": f"{job_canonical}#org",
+        "name": job.employer_name,
+    }
+    if job.employer_domain:
+        org["url"] = f"https://{job.employer_domain}"
+        org["sameAs"] = [f"https://{job.employer_domain}"]
+    if job.employer_logo_url:
+        org["logo"] = job.employer_logo_url
+
+    breadcrumbs = {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Jobs", "item": _canonical_url("/search")},
+            {
+                "@type": "ListItem", "position": 2,
+                "name": job.employer_name,
+                "item": _canonical_url(f"/search?employer={job.employer_domain or ''}"),
+            },
+            {"@type": "ListItem", "position": 3, "name": job.title, "item": job_canonical},
+        ],
+    }
+
+    faqs = _build_faqs(job, employer)
+    faq_page = {
+        "@type": "FAQPage",
+        "@id": f"{job_canonical}#faq",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": f["q"],
+                "acceptedAnswer": {"@type": "Answer", "text": f["a"]},
+            }
+            for f in faqs
+        ],
+    }
+
+    graph = {
+        "@context": "https://schema.org",
+        "@graph": [job_posting, org, breadcrumbs, faq_page],
+    }
+    return json.dumps(graph, indent=2, ensure_ascii=False)
 
 
 def _job_to_template_obj(job: Job) -> dict:
@@ -453,7 +603,6 @@ async def job_detail_page(
         return HTMLResponse("<h1>Job not found</h1>", status_code=404)
 
     job_obj = _job_to_template_obj(job)
-    json_ld = _build_json_ld(job)
 
     # Similar jobs — same employer first; if not enough, top up with same primary category
     similar_stmt = (
@@ -486,6 +635,7 @@ async def job_detail_page(
 
     # Employer panel
     employer_panel = None
+    emp: Employer | None = None
     if job.employer_id:
         emp_result = await session.execute(select(Employer).where(Employer.id == job.employer_id))
         emp = emp_result.scalar_one_or_none()
@@ -507,9 +657,15 @@ async def job_detail_page(
                 "initial": (emp.name[:1] or "?").upper(),
             }
 
+    json_ld = _build_json_ld(job, emp)
+    faqs = _build_faqs(job, emp)
+    canonical = _canonical_url(f"/jobs/{job.id}")
+
     return templates.TemplateResponse(request, "job_detail.html", {
         "job": job_obj,
         "json_ld": json_ld,
+        "faqs": faqs,
+        "canonical_url": canonical,
         "similar_jobs": similar_jobs,
         "employer_panel": employer_panel,
     })
