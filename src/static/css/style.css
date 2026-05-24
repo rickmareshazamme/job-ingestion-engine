@@ -488,11 +488,26 @@ a:hover { color: var(--color-accent-hover); }
     line-height: 1.8;
     color: var(--color-text-secondary);
 }
+/* Shazamme tenants paste descriptions out of Word/Outlook with inline
+   font-family declarations (Times New Roman, Arial, Calibri, etc). Force
+   every descendant — including elements with style="font-family:..." —
+   back to Inter so the page reads as one document, not a copy-paste collage. */
+.job-description, .job-description * {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}
 .job-description h2, .job-description h3 { color: var(--color-text); margin-top: 2rem; margin-bottom: 0.5rem; }
 .job-description ul, .job-description ol { padding-left: 1.5rem; margin: 0.75rem 0; }
 .job-description li { margin-bottom: 0.25rem; }
 .job-description a { color: var(--color-accent); }
 .job-description p { margin-bottom: 0.75rem; }
+/* Strip inline background/color/font-size from pasted-in markup; keep
+   bold/italic since those carry meaning. font-size left to the element
+   defaults from the rules above (p, li, h2/h3). */
+.job-description [style] {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+.job-description font { font-family: inherit !important; color: inherit !important; }
 
 .apply-button {
     display: inline-flex;
