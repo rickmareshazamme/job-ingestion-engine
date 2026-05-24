@@ -38,7 +38,7 @@ async def _run_parsed_search(session: AsyncSession, parsed) -> list:
     if parsed.city:
         cpat = f"%{parsed.city}%"
         clauses.append(or_(Job.location_city.ilike(cpat), Job.location_raw.ilike(cpat)))
-    if parsed.remote is True:
+    if parsed.is_remote is True:
         clauses.append(Job.is_remote == True)
     if parsed.employment_type:
         clauses.append(Job.employment_type == parsed.employment_type)
@@ -62,7 +62,7 @@ def _explain(parsed) -> list[str]:
     if parsed.keywords: bits.append(f"matching <strong>{parsed.keywords}</strong>")
     if parsed.city: bits.append(f"in <strong>{parsed.city}</strong>")
     if parsed.country: bits.append(f"country <strong>{parsed.country.upper()}</strong>")
-    if parsed.remote is True: bits.append("<strong>remote-friendly</strong>")
+    if parsed.is_remote is True: bits.append("<strong>remote-friendly</strong>")
     if parsed.salary_min: bits.append(f"paying ≥ <strong>{parsed.salary_min:,}</strong>")
     if parsed.salary_max: bits.append(f"paying ≤ <strong>{parsed.salary_max:,}</strong>")
     if parsed.employment_type: bits.append(f"<strong>{parsed.employment_type.replace('_', ' ').lower()}</strong>")
@@ -133,7 +133,7 @@ async def match_api(q: str, session: AsyncSession = Depends(get_session)):
         "query": q,
         "parsed": {
             "keywords": parsed.keywords, "city": parsed.city, "country": parsed.country,
-            "remote": parsed.remote, "salary_min": parsed.salary_min, "salary_max": parsed.salary_max,
+            "is_remote": parsed.is_remote, "salary_min": parsed.salary_min, "salary_max": parsed.salary_max,
             "employment_type": parsed.employment_type, "seniority": parsed.seniority,
         },
         "count": len(safe_results),
