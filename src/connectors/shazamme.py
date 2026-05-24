@@ -123,8 +123,9 @@ class ShazammeConnector(BaseConnector):
             else:
                 src = fh
 
-            parser = LET.XMLParser(recover=True, huge_tree=True, encoding="utf-8")
-            for event, el in LET.iterparse(src, events=("end",), parser=parser):
+            for event, el in LET.iterparse(
+                src, events=("end",), recover=True, huge_tree=True, encoding="utf-8",
+            ):
                 tag = LET.QName(el.tag).localname if isinstance(el.tag, str) else el.tag
                 if tag != "job":
                     continue
