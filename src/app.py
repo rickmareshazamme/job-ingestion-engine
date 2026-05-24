@@ -120,7 +120,7 @@ app = FastAPI(
         "appreciated, not required. Email `hello@zammejobs.com` to get on the AI "
         "lab allowlist."
     ),
-    version="0.8.0",
+    version="0.8.1",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=TAGS_METADATA,
@@ -167,4 +167,4 @@ app.include_router(frontend_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "job-index", "version": "0.8.0"}
+    return {"status": "ok", "service": "job-index", "version": "0.8.1"}

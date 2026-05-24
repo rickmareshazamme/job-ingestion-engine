@@ -549,7 +549,16 @@ def validate_active_job_urls(sample_size: int = 500):
 
     Catches jobs filled between full crawls without waiting 7 days for
     mark_stale_jobs to expire them.
+
+    Skipped entirely when shazamme_only_ingestion is on: many Shazamme
+    tenant sites sit behind Cloudflare and block HEAD / bot user-agents,
+    so the check produces false-positives and would silently expire
+    valid jobs. The Shazamme daily feed handles lifecycle.
     """
+    if settings.shazamme_only_ingestion:
+        logger.info("validate_active_job_urls: skipped (shazamme_only_ingestion on)")
+        return {"checked": 0, "expired": 0, "skipped_reason": "shazamme_only_ingestion"}
+
     import asyncio
     import aiohttp
     from sqlalchemy import select

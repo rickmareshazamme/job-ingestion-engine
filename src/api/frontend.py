@@ -830,8 +830,12 @@ async def apply_redirect(
     job_id: str,
     session: AsyncSession = Depends(get_session),
 ):
-    """Live-check the job's apply URL. If it 404s or times out, mark expired
-    and redirect the user to the employer's career page (or homepage)."""
+    """Redirect to the job's apply URL on the employer/tenant site, with
+    UTM appended. We do NOT pre-check liveness — many ATS sites (and
+    Shazamme tenants behind Cloudflare) block HEAD/bot user-agents, so
+    the check was falsely classifying live jobs as dead and bouncing
+    users to the employer homepage. Shazamme manages job lifecycle via
+    the daily feed; expired rows drop out on next ingest."""
     try:
         uid = UUID(job_id)
     except ValueError:
@@ -842,26 +846,16 @@ async def apply_redirect(
     if not job:
         return RedirectResponse("/", status_code=302)
 
+    if job.source_url:
+        return RedirectResponse(_append_utm(job.source_url), status_code=302)
+
     employer = None
     if job.employer_id:
         emp_result = await session.execute(select(Employer).where(Employer.id == job.employer_id))
         employer = emp_result.scalar_one_or_none()
 
-    target = job.source_url
-    alive = await _is_url_alive(target) if target else False
-
-    if alive:
-        return RedirectResponse(_append_utm(target), status_code=302)
-
-    # Mark the job expired and redirect to the employer's site instead.
-    try:
-        await session.execute(
-            update(Job).where(Job.id == uid).values(status="expired", date_updated=datetime.utcnow())
-        )
-        await session.commit()
-        logger.info("Job %s marked expired (apply URL dead): %s", job_id, target)
-    except Exception as e:
-        logger.warning("Failed to mark job %s expired: %s", job_id, e)
-
+    # source_url missing — last resort, send to the employer's career page.
+    # No DB mutation here; if the URL is genuinely empty in the feed, the
+    # next Shazamme import will refresh or drop the row.
     fallback = _employer_fallback_url(job, employer)
     return RedirectResponse(_append_utm(fallback), status_code=302)

@@ -41,9 +41,26 @@ def _hide(conn) -> int:
     return result.rowcount
 
 
+def _restore_falsely_expired_shazamme(conn) -> int:
+    """Undo expiry of Shazamme rows that the apply-route liveness check
+    (now removed) wrongly marked expired. Only touches rows still in
+    the feed — joined back via source_id."""
+    result = conn.execute(text("""
+        UPDATE jobs
+        SET status = 'active',
+            date_updated = NOW()
+        WHERE source_type = 'shazamme_feed'
+          AND status = 'expired'
+    """))
+    return result.rowcount
+
+
 def main() -> None:
     engine = create_engine(settings.database_url_sync)
     with engine.begin() as conn:
+        n_restored = _restore_falsely_expired_shazamme(conn)
+        if n_restored:
+            print(f"sync_shazamme_visibility: restored {n_restored} Shazamme rows from 'expired'", flush=True)
         if not settings.shazamme_only_ingestion:
             n = _restore(conn)
             print(f"sync_shazamme_visibility: flag OFF, restored {n} jobs", flush=True)
