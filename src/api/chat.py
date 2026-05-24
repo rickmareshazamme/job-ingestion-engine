@@ -115,6 +115,20 @@ async def match_api(q: str, session: AsyncSession = Depends(get_session)):
     """JSON variant for AI agents / LLM tool-calling."""
     parsed = parse_natural_language(q)
     results = await _run_parsed_search(session, parsed)
+    # _job_to_template_obj embeds datetime and UUID; stringify here so
+    # JSONResponse doesn't 500 on them.
+    safe_results = []
+    for j in results:
+        safe_results.append({
+            "id": str(j["id"]),
+            "title": j["title"],
+            "employer": j.get("employer_name"),
+            "location": j.get("location"),
+            "salary": j.get("salary"),
+            "is_remote": bool(j.get("is_remote")),
+            "url": _canonical_url(f"/jobs/{j['id']}"),
+            "apply_url": j.get("source_url"),
+        })
     return JSONResponse({
         "query": q,
         "parsed": {
@@ -122,14 +136,6 @@ async def match_api(q: str, session: AsyncSession = Depends(get_session)):
             "remote": parsed.remote, "salary_min": parsed.salary_min, "salary_max": parsed.salary_max,
             "employment_type": parsed.employment_type, "seniority": parsed.seniority,
         },
-        "count": len(results),
-        "results": [
-            {
-                "id": j["id"], "title": j["title"], "employer": j["employer_name"],
-                "location": j["location"], "salary": j["salary"], "is_remote": j["is_remote"],
-                "url": _canonical_url(f"/jobs/{j['id']}"),
-                "apply_url": j.get("source_url"),
-            }
-            for j in results
-        ],
+        "count": len(safe_results),
+        "results": safe_results,
     })

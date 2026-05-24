@@ -55,19 +55,33 @@ def slug_to_phrase(slug: str) -> str:
 
 
 def _role_match_clause(role_slug: str):
-    """SQL clause for matching jobs against a role slug. We hit titles and
-    categories[] because Shazamme tenants put the role in both places
-    with inconsistent capitalization."""
-    phrase = slug_to_phrase(role_slug)
-    pat = f"%{phrase}%"
-    return or_(Job.title.ilike(pat), Job.categories.any(phrase))
+    """SQL clause for matching jobs against a role slug.
+
+    Slugs round-trip with information loss — "Registered Nurse (RN)"
+    slugifies to "registered-nurse-rn" then reconstructs to "Registered
+    Nurse Rn" which won't ILIKE "%Registered Nurse (RN)%" or array-match
+    the original category. Solution: tokenize the slug and match every
+    word individually against title (case-insensitive). Categories[] also
+    gets a per-word existence check via array_to_string + ilike."""
+    tokens = [t for t in role_slug.split("-") if t and len(t) >= 2]
+    if not tokens:
+        return Job.id.is_(None)
+
+    # All tokens must appear in title OR in the joined categories string.
+    cat_str = func.array_to_string(Job.categories, " ")
+    per_token = [or_(Job.title.ilike(f"%{t}%"), cat_str.ilike(f"%{t}%")) for t in tokens]
+    return and_(*per_token)
 
 
 def _city_match_clause(city_slug: str):
-    phrase = slug_to_phrase(city_slug)
-    pat = f"%{phrase}%"
-    # Some tenants store the city in location_raw, others in location_city.
-    return or_(Job.location_city.ilike(pat), Job.location_raw.ilike(pat))
+    """Same tokenize-and-match strategy as _role_match_clause — city
+    slugs lose punctuation too (e.g. "st-petersburg" vs "St. Petersburg")."""
+    tokens = [t for t in city_slug.split("-") if t and len(t) >= 2]
+    if not tokens:
+        return Job.id.is_(None)
+    per_token = [or_(Job.location_city.ilike(f"%{t}%"), Job.location_raw.ilike(f"%{t}%"))
+                 for t in tokens]
+    return and_(*per_token)
 
 
 async def _matching_jobs(
