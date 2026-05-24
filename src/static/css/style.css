@@ -1363,3 +1363,36 @@ a.emp-stat-link:hover { background: var(--color-bg-hover); color: var(--color-ac
 .qa-skill:hover { color: var(--color-accent); border-color: var(--color-accent); }
 .qa-ask { margin: 0; color: var(--color-text-muted); font-size: 0.82rem; }
 .qa-ask a { color: var(--color-accent); }
+
+/* Industry hubs + skill pages */
+.hub-section { margin: 2rem 0; }
+.hub-section h2 { font-size: 1.15rem; margin: 0 0 0.85rem; }
+.hub-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.hub-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.7rem; border: 1px solid var(--color-border); border-radius: 999px; font-size: 0.85rem; color: var(--color-text); text-decoration: none; background: var(--color-bg-card); }
+.hub-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.hub-chip-n { color: var(--color-text-muted); font-size: 0.72rem; font-weight: 500; }
+.hub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem; }
+.hub-card { display: block; padding: 1rem 1.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-card); text-decoration: none; color: var(--color-text); transition: border-color var(--transition); }
+.hub-card:hover { border-color: var(--color-accent); }
+.hub-card-title { font-weight: 600; margin-bottom: 0.2rem; }
+.hub-card-meta { color: var(--color-text-muted); font-size: 0.82rem; margin-bottom: 0.3rem; }
+.hub-card-tagline { color: var(--color-text-secondary); font-size: 0.85rem; line-height: 1.45; }
+
+/* AI Job Match */
+.match-page { max-width: 820px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.match-form { display: flex; gap: 0.5rem; margin: 1.5rem 0; }
+.match-form input { flex: 1; padding: 0.85rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-elevated); color: var(--color-text); font-family: var(--font); font-size: 1rem; }
+.match-form input:focus { outline: none; border-color: var(--color-accent); box-shadow: var(--shadow-glow); }
+.match-form button { padding: 0.85rem 1.5rem; border: none; border-radius: var(--radius-md); background: var(--color-accent); color: white; font-weight: 600; cursor: pointer; }
+.match-form button:hover { background: var(--color-accent-hover); }
+.match-examples { margin: 1rem 0 2rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.match-examples-label { color: var(--color-text-muted); font-size: 0.85rem; margin-right: 0.25rem; }
+.match-example { padding: 0.4rem 0.75rem; border: 1px solid var(--color-border-subtle); border-radius: 999px; font-size: 0.82rem; color: var(--color-text-secondary); text-decoration: none; background: var(--color-bg-card); }
+.match-example:hover { color: var(--color-accent); border-color: var(--color-accent); }
+.match-explain { padding: 0.75rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg-card); margin: 1rem 0; font-size: 0.9rem; color: var(--color-text-secondary); }
+.match-explain-label { color: var(--color-text-muted); font-weight: 500; margin-right: 0.4rem; }
+.match-results { margin-top: 1.5rem; }
+.match-results h2 { font-size: 1.1rem; margin: 0 0 0.85rem; }
+.match-empty { padding: 1.5rem; text-align: center; color: var(--color-text-muted); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
+.match-foot { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 0.85rem; text-align: center; }
+.match-foot code { background: var(--color-bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.8em; }

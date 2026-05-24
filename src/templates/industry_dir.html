@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block content %}
+<div class="landing">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li aria-current="page">Industries</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head">
+        <h1>Browse jobs by industry</h1>
+        <p class="landing-sub">{{ description }}</p>
+    </header>
+
+    <section class="hub-grid">
+        {% for ind in industries %}
+        <a href="/industry/{{ ind.slug }}" class="hub-card">
+            <div class="hub-card-title">{{ ind.name }}</div>
+            <div class="hub-card-meta">{{ "{:,}".format(ind.n) }} live role{{ "s" if ind.n != 1 else "" }}</div>
+            <div class="hub-card-tagline">{{ ind.tagline }}</div>
+        </a>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}

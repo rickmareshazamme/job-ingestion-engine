@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block og_meta %}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ZammeJobs">
+<meta property="og:title" content="{{ industry }} jobs">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+{% endblock %}
+
+{% block head_extra %}
+<script type="application/ld+json">{{ json_ld | safe }}</script>
+{% endblock %}
+
+{% block content %}
+<div class="landing industry-hub">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li><a href="/industry">Industries</a></li>
+            <li aria-current="page">{{ industry }}</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head">
+        <h1>{{ industry }} jobs</h1>
+        <p class="landing-sub">{{ "{:,}".format(total) }} live openings · {{ tagline }}</p>
+        <p style="color: var(--color-text-secondary); margin-top: 0.75rem; max-width: 720px;">{{ intro }}</p>
+    </header>
+
+    {% if by_role %}
+    <section class="hub-section">
+        <h2>Top {{ industry }} roles</h2>
+        <div class="hub-chips">
+            {% for r in by_role[:18] %}
+            <a href="/jobs/role/{{ r.slug }}" class="hub-chip">{{ r.name }} <span class="hub-chip-n">{{ r.n }}</span></a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if by_employer %}
+    <section class="hub-section">
+        <h2>Top {{ industry }} employers hiring now</h2>
+        <div class="hub-grid">
+            {% for e in by_employer %}
+            <a href="/search?employer={{ e.domain or e.name }}" class="hub-card">
+                <div class="hub-card-title">{{ e.name }}</div>
+                <div class="hub-card-meta">{{ e.n }} open role{{ "s" if e.n != 1 else "" }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if by_city %}
+    <section class="hub-section">
+        <h2>{{ industry }} jobs by city</h2>
+        <div class="hub-chips">
+            {% for c in by_city %}
+            <a href="/jobs/in/{{ c.city | lower | replace(' ', '-') }}" class="hub-chip">{{ c.city }} <span class="hub-chip-n">{{ c.n }}</span></a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="hub-section">
+        <h2>Latest openings</h2>
+        <div class="landing-list">
+            {% for j in sample_jobs %}
+            <a href="/jobs/{{ j.id }}" class="job-card">
+                <div class="job-card-title">{{ j.title }}</div>
+                <div class="job-card-meta">
+                    <span class="job-card-emp">{{ j.employer_name }}</span>
+                    {% if j.location.city or j.location.country %}<span class="dot-sep">·</span><span>{{ j.location.city or j.location.country }}</span>{% endif %}
+                    {% if j.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+                    {% if j.salary.min %}<span class="dot-sep">·</span><span class="job-card-salary">{{ j.salary.currency or "USD" }} {{ "{:,}".format(j.salary.min) }}{% if j.salary.max and j.salary.max != j.salary.min %}–{{ "{:,}".format(j.salary.max) }}{% endif %}</span>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% if total > sample_jobs|length %}
+        <p class="landing-more">Showing {{ sample_jobs|length }} of {{ "{:,}".format(total) }} — <a href="/search?q={{ industry }}">refine your search</a>.</p>
+        {% endif %}
+    </section>
+
+    <section class="job-faqs">
+        <h2>Frequently asked questions</h2>
+        <div class="faq-list">
+            {% for f in faqs %}
+            <details class="faq-item">
+                <summary>{{ f.q }}</summary>
+                <div class="faq-answer">{{ f.a }}</div>
+            </details>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

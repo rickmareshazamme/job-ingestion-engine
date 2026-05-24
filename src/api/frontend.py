@@ -320,11 +320,40 @@ def _build_json_ld(job: Job, employer: Employer | None = None) -> str:
         ],
     }
 
+    extras: list = []
+
+    # SalaryEstimate as a standalone entity so AI engines and Google's
+    # rich-result system can cite the figure without re-parsing JobPosting.
+    if job.salary_min:
+        extras.append({
+            "@type": "Occupation",
+            "@id": f"{job_canonical}#occupation",
+            "name": job.title,
+            "estimatedSalary": {
+                "@type": "MonetaryAmountDistribution",
+                "name": "Salary",
+                "currency": job.salary_currency or "USD",
+                "duration": _ISO8601_DURATION.get((job.salary_period or "year").lower(), "P1Y"),
+                "minValue": job.salary_min,
+                "maxValue": job.salary_max or job.salary_min,
+                "median": int(((job.salary_min or 0) + (job.salary_max or job.salary_min or 0)) / 2),
+            },
+            "occupationLocation": (
+                {"@type": "City", "name": job.location_city} if job.location_city
+                else ({"@type": "Country", "name": job.location_country} if job.location_country else None)
+            ),
+        })
+
     graph = {
         "@context": "https://schema.org",
-        "@graph": [job_posting, org, breadcrumbs, faq_page],
+        "@graph": [job_posting, org, breadcrumbs, faq_page] + extras,
     }
     return json.dumps(graph, indent=2, ensure_ascii=False)
+
+
+_ISO8601_DURATION = {"year": "P1Y", "yearly": "P1Y", "annual": "P1Y", "month": "P1M",
+                     "monthly": "P1M", "week": "P1W", "weekly": "P1W",
+                     "day": "P1D", "daily": "P1D", "hour": "PT1H", "hourly": "PT1H"}
 
 
 def _job_to_template_obj(job: Job) -> dict:

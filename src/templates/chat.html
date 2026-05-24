@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block content %}
+<div class="match-page">
+    <header class="landing-head" style="text-align: center; margin-top: 2rem;">
+        <h1>AI Job Match</h1>
+        <p class="landing-sub">Describe what you're looking for. ZammeJobs returns a ranked shortlist from real employer ATSes — no login, no resume database.</p>
+    </header>
+
+    <form method="get" action="/match" class="match-form">
+        <input type="text" name="q" value="{{ q }}" placeholder="e.g. Remote senior backend engineer jobs paying over $150K" autofocus required>
+        <button type="submit">Match</button>
+    </form>
+
+    {% if not q %}
+    <div class="match-examples">
+        <div class="match-examples-label">Try:</div>
+        {% for ex in examples %}
+        <a href="/match?q={{ ex | urlencode }}" class="match-example">{{ ex }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if q and explained %}
+    <div class="match-explain">
+        <span class="match-explain-label">Interpreted as:</span> {{ explained | join(" · ") | safe }}
+    </div>
+    {% endif %}
+
+    {% if q %}
+    <section class="match-results">
+        {% if results %}
+        <h2>{{ results | length }} matching role{{ "s" if results | length != 1 else "" }}</h2>
+        <div class="landing-list">
+            {% for j in results %}
+            <a href="/jobs/{{ j.id }}" class="job-card">
+                <div class="job-card-title">{{ j.title }}</div>
+                <div class="job-card-meta">
+                    <span class="job-card-emp">{{ j.employer_name }}</span>
+                    {% if j.location.city or j.location.country %}<span class="dot-sep">·</span><span>{{ j.location.city or j.location.country }}</span>{% endif %}
+                    {% if j.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+                    {% if j.salary.min %}<span class="dot-sep">·</span><span class="job-card-salary">{{ j.salary.currency or "USD" }} {{ "{:,}".format(j.salary.min) }}{% if j.salary.max and j.salary.max != j.salary.min %}–{{ "{:,}".format(j.salary.max) }}{% endif %}</span>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="match-empty">
+            <p>No live matches for that query right now.</p>
+            <p>Try a broader version, or browse <a href="/industry">by industry</a> or <a href="/search">full search</a>.</p>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="match-foot">
+        <p>Built for AI agents too — call <code>GET /api/v1/match?q=...</code> from any tool-calling LLM. Returns JSON with parsed filters + ranked results.</p>
+    </section>
+</div>
+{% endblock %}

@@ -234,6 +234,7 @@ async def sitemap_landing(request: Request, session: AsyncSession = Depends(get_
         role_slugs.append(s)
         urls.append(f"{base}/jobs/role/{s}")
         urls.append(f"{base}/salaries/{s}")
+        urls.append(f"{base}/skills/{s}")
         if len(role_slugs) >= 150:
             break
 
@@ -340,18 +341,29 @@ async def sitemap_employers(
 
 @router.get("/sitemap-static.xml", response_class=Response)
 async def sitemap_static(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
+    from src.api.industry import INDUSTRIES
+
     static_routes = [
         ("/", "1.0", "hourly"),
         ("/search", "0.9", "hourly"),
+        ("/match", "0.9", "daily"),
         ("/employers", "0.7", "daily"),
+        ("/industry", "0.8", "daily"),
+        ("/status", "0.6", "hourly"),
         ("/for-ai", "0.7", "weekly"),
         ("/docs", "0.4", "weekly"),
         ("/llms.txt", "0.5", "daily"),
         ("/ai.txt", "0.4", "weekly"),
         ("/humans.txt", "0.3", "yearly"),
         ("/citation.bib", "0.4", "yearly"),
+        ("/jobs.rss", "0.6", "hourly"),
+        ("/jobs.atom", "0.6", "hourly"),
+        ("/jobs-ai.json", "0.6", "hourly"),
     ]
+    # Industry hubs — fixed taxonomy, all worth indexing.
+    for slug in INDUSTRIES:
+        static_routes.append((f"/industry/{slug}", "0.8", "daily"))
     urls = "\n".join(
         f"  <url><loc>{base}{path}</loc><priority>{prio}</priority><changefreq>{cf}</changefreq></url>"
         for path, prio, cf in static_routes
