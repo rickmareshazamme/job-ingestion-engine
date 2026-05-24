@@ -1396,3 +1396,46 @@ a.emp-stat-link:hover { background: var(--color-bg-hover); color: var(--color-ac
 .match-empty { padding: 1.5rem; text-align: center; color: var(--color-text-muted); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
 .match-foot { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 0.85rem; text-align: center; }
 .match-foot code { background: var(--color-bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.8em; }
+
+/* Alerts + Resume match forms — single column, generous, consistent
+   with the .match-page / .qa style. */
+.alert-form, .resume-form { display: flex; flex-direction: column; gap: 0.55rem; max-width: 560px; margin: 1.5rem auto; }
+.alert-form label, .resume-form label { color: var(--color-text-secondary); font-size: 0.85rem; font-weight: 500; margin-top: 0.5rem; }
+.alert-form input, .alert-form select,
+.resume-form input[type="file"], .resume-form textarea {
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+    font-family: var(--font);
+    font-size: 0.95rem;
+}
+.alert-form input:focus, .alert-form select:focus,
+.resume-form input:focus, .resume-form textarea:focus {
+    outline: none; border-color: var(--color-accent);
+    box-shadow: var(--shadow-glow);
+}
+.alert-form button, .resume-form button {
+    margin-top: 0.75rem;
+    padding: 0.85rem 1.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--color-accent);
+    color: white;
+    font-family: var(--font);
+    font-weight: 600;
+    cursor: pointer;
+}
+.alert-form button:hover, .resume-form button:hover { background: var(--color-accent-hover); }
+.alert-foot { color: var(--color-text-muted); font-size: 0.8rem; margin-top: 0.5rem; text-align: center; }
+.resume-or { text-align: center; color: var(--color-text-muted); font-size: 0.85rem; margin: 0.5rem 0 0.25rem; position: relative; }
+.resume-or span { background: var(--color-bg); padding: 0 0.75rem; position: relative; z-index: 1; }
+.resume-or::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; border-top: 1px solid var(--color-border-subtle); }
+.resume-profile { max-width: 760px; margin: 1.5rem auto; padding: 1.25rem 1.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-card); }
+.resume-profile h2 { font-size: 1.05rem; margin: 0 0 0.85rem; }
+.job-card-why { color: var(--color-text-muted); font-size: 0.78rem; margin-top: 0.4rem; }
+
+.alert-banner { padding: 0.85rem 1.1rem; border-radius: var(--radius-md); margin: 1rem auto; max-width: 560px; font-size: 0.92rem; border: 1px solid var(--color-border); background: var(--color-bg-card); }
+.alert-banner.success { border-color: var(--color-success); color: var(--color-success); background: var(--color-success-muted); }
+.alert-banner.error { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.08); }

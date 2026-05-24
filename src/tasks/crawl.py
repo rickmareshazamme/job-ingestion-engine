@@ -745,3 +745,105 @@ def crawl_all_due_sources():
         }
     finally:
         session.close()
+
+
+@celery_app.task
+def send_due_alerts():
+    """For each confirmed, active JobAlert whose cadence is due, find new
+    matching jobs since last_sent_at and email a digest. Idempotent on
+    re-run (last_sent_at updates within the same transaction)."""
+    import asyncio
+
+    from src.api.frontend import _canonical_url
+    from src.mcp_server.nl_parser import parse_natural_language
+    from src.models import JobAlert
+    from src.services.email import send_email, signed_token
+
+    session = _get_sync_session()
+    sent = 0
+    skipped = 0
+    try:
+        cadence_hours = {"instant": 0, "daily": 24, "weekly": 168}
+        now = datetime.utcnow()
+
+        alerts = session.execute(
+            select(JobAlert).where(JobAlert.is_active == True, JobAlert.is_confirmed == True)
+        ).scalars().all()
+
+        for alert in alerts:
+            interval = cadence_hours.get(alert.cadence, 24)
+            if alert.last_sent_at is not None:
+                next_due = alert.last_sent_at + timedelta(hours=interval)
+                if now < next_due:
+                    skipped += 1
+                    continue
+
+            since = alert.last_sent_at or (now - timedelta(days=7))
+            parsed = parse_natural_language(alert.query)
+
+            clauses = [Job.status == "active", Job.date_crawled >= since]
+            if parsed.keywords:
+                pat = f"%{parsed.keywords}%"
+                clauses.append(Job.title.ilike(pat) | Job.description_text.ilike(pat))
+            if parsed.country:
+                clauses.append(Job.location_country == parsed.country.upper())
+            if parsed.city:
+                cpat = f"%{parsed.city}%"
+                clauses.append(Job.location_city.ilike(cpat) | Job.location_raw.ilike(cpat))
+            if parsed.is_remote is True:
+                clauses.append(Job.is_remote == True)
+            if parsed.salary_min:
+                clauses.append(Job.salary_max >= parsed.salary_min)
+
+            new_jobs = session.execute(
+                select(Job).where(*clauses)
+                .order_by(Job.date_posted.desc().nullslast())
+                .limit(15)
+            ).scalars().all()
+
+            session.execute(
+                update(JobAlert).where(JobAlert.id == alert.id)
+                .values(last_sent_at=now, last_match_count=len(new_jobs))
+            )
+            session.commit()
+
+            if not new_jobs:
+                continue
+
+            unsub = signed_token({"alert_id": str(alert.id), "purpose": "unsubscribe"})
+            unsub_url = _canonical_url(f"/alerts/unsubscribe?token={unsub}")
+            cards_html = "\n".join(
+                f"""<a href="{_canonical_url(f"/jobs/{j.id}")}" style="display:block;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;text-decoration:none;color:#111;">
+<div style="font-weight:600;margin-bottom:4px;">{j.title}</div>
+<div style="color:#6b7280;font-size:13px;">{j.employer_name}{' · ' + (j.location_city or j.location_country) if (j.location_city or j.location_country) else ''}{' · Remote' if j.is_remote else ''}{' · ' + (j.salary_currency or 'USD') + ' ' + format(j.salary_min, ',') if j.salary_min else ''}</div>
+</a>"""
+                for j in new_jobs
+            )
+            html = f"""<!doctype html><html><body style="font-family:-apple-system,sans-serif;max-width:560px;margin:2rem auto;color:#111;">
+<h2 style="color:#EC008C;">{len(new_jobs)} new match{'es' if len(new_jobs) != 1 else ''} for: {alert.query}</h2>
+{cards_html}
+<p style="margin-top:24px;color:#6b7280;font-size:12px;">
+  ZammeJobs · <a href="https://www.zammejobs.com" style="color:#EC008C;">www.zammejobs.com</a> · <a href="{unsub_url}" style="color:#6b7280;">Unsubscribe</a>
+</p>
+</body></html>"""
+
+            try:
+                asyncio.get_event_loop()
+                ok = asyncio.run(send_email(
+                    alert.email,
+                    f"{len(new_jobs)} new job{'s' if len(new_jobs) != 1 else ''} matching '{alert.query[:60]}'",
+                    html,
+                ))
+            except RuntimeError:
+                ok = asyncio.run(send_email(
+                    alert.email,
+                    f"{len(new_jobs)} new job{'s' if len(new_jobs) != 1 else ''} matching '{alert.query[:60]}'",
+                    html,
+                ))
+            if ok:
+                sent += 1
+
+        logger.info("send_due_alerts: sent=%d skipped=%d total=%d", sent, skipped, len(alerts))
+        return {"sent": sent, "skipped": skipped, "total": len(alerts)}
+    finally:
+        session.close()

@@ -129,3 +129,29 @@ class CrawlRun(Base):
     jobs_removed = Column(Integer, default=0)
     error_message = Column(Text)
     duration_seconds = Column(Float)
+
+
+class JobAlert(Base):
+    """A saved natural-language query that emails matching new jobs to a
+    subscriber. The query string is the same shape /match accepts."""
+    __tablename__ = "job_alerts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(Text, nullable=False, index=True)
+    query = Column(Text, nullable=False)
+    # Optional structured overrides — if the parser misses something the
+    # user can override here. JSONB shape mirrors ParsedQuery.
+    filters = Column(JSONB, default=dict)
+    cadence = Column(Text, default="daily")  # daily | weekly | instant
+    is_confirmed = Column(Boolean, default=False, index=True)
+    is_active = Column(Boolean, default=True, index=True)
+    confirm_token = Column(Text)  # signed, single-use; cleared on confirm
+    last_sent_at = Column(DateTime(timezone=True))
+    last_match_count = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("idx_job_alerts_email", "email"),
+        Index("idx_job_alerts_active_due", "is_active", "is_confirmed", "last_sent_at"),
+    )

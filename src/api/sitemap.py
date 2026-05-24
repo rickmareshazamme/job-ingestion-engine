@@ -348,6 +348,8 @@ async def sitemap_static(request: Request):
         ("/", "1.0", "hourly"),
         ("/search", "0.9", "hourly"),
         ("/match", "0.9", "daily"),
+        ("/match-resume", "0.9", "daily"),
+        ("/alerts", "0.7", "weekly"),
         ("/employers", "0.7", "daily"),
         ("/industry", "0.8", "daily"),
         ("/status", "0.6", "hourly"),

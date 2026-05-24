@@ -37,6 +37,21 @@ python-dotenv
 # Google Indexing API (optional — only used if GOOGLE_SA_FILE is set)
 google-auth
 
+# AI Resume Match (Anthropic Claude) — optional, no-op without ANTHROPIC_API_KEY
+anthropic
+
+# PDF/DOCX parsing for resume upload
+pypdf
+python-docx
+
+# Form-multipart parsing (FastAPI's File/UploadFile)
+python-multipart
+
+# Email (Job Alerts) — Resend HTTP API; no SDK, plain httpx call
+
+# Itsdangerous — signed tokens for unsubscribe / alert confirmation
+itsdangerous
+
 # Testing
 pytest
 pytest-asyncio

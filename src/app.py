@@ -7,7 +7,9 @@ from src.api.admin import router as admin_router
 from src.api.ai import router as ai_router
 from src.api.country import router as country_router
 from src.api.data import router as data_router
+from src.api.alerts import router as alerts_router
 from src.api.chat import router as chat_router
+from src.api.resume_match import router as resume_match_router
 from src.api.embed import router as embed_router
 from src.api.employer_register import router as employer_register_router
 from src.api.feeds import router as feeds_router
@@ -180,6 +182,8 @@ app.include_router(industry_router)
 app.include_router(skills_router)
 app.include_router(feeds_router)
 app.include_router(chat_router)
+app.include_router(alerts_router)
+app.include_router(resume_match_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)

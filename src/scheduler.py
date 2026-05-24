@@ -33,6 +33,13 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/30"),
         "kwargs": {"batch_size": 5000},
     },
+    # Send job alerts to subscribers. Runs hourly; per-row cadence
+    # (instant / daily / weekly) is enforced inside the task by checking
+    # last_sent_at vs the cadence interval.
+    "send-due-alerts": {
+        "task": "src.tasks.crawl.send_due_alerts",
+        "schedule": crontab(minute=10),  # 10 past every hour
+    },
     # Common Crawl harvest is DISABLED for live ingestion — WDC's
     # 2024-12 extract is from October 2024, so every JobPosting in it is
     # at least 18 months old by the time we'd ingest it. We only want

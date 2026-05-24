@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block content %}
+<div class="match-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li aria-current="page">AI Resume Match</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head" style="text-align: center;">
+        <h1>AI Resume Match</h1>
+        <p class="landing-sub">Paste or upload your CV. Claude extracts your target role, skills, location and salary. We return the live jobs that fit. <strong>Resumes are never stored.</strong></p>
+    </header>
+
+    {% if not submitted %}
+    <form method="post" action="/match-resume" enctype="multipart/form-data" class="resume-form">
+        <label for="resume-text">Paste your resume</label>
+        <textarea id="resume-text" name="resume_text" rows="10" placeholder="Paste plain text from your CV here…"></textarea>
+
+        <div class="resume-or"><span>or</span></div>
+
+        <label for="resume-file">Upload a PDF or DOCX</label>
+        <input type="file" id="resume-file" name="resume_file" accept=".pdf,.docx,.txt">
+
+        <button type="submit">Match my CV</button>
+        <p class="alert-foot">No login. No storage. The resume is processed in memory for this one request and discarded.</p>
+    </form>
+    {% else %}
+        {% if error %}
+        <div class="alert-banner error">{{ error }}</div>
+        <p style="text-align: center;"><a href="/match-resume">Try again</a></p>
+        {% else %}
+        <section class="resume-profile">
+            <h2>Your matched profile</h2>
+            <dl class="qa-grid">
+                <div class="qa-cell"><dt>Target role</dt><dd>{{ profile.target_role or "—" }}</dd></div>
+                {% if profile.seniority %}<div class="qa-cell"><dt>Seniority</dt><dd>{{ profile.seniority | capitalize }}</dd></div>{% endif %}
+                {% if profile.preferred_location_city or profile.preferred_location_country %}
+                <div class="qa-cell"><dt>Location</dt><dd>{{ profile.preferred_location_city or profile.preferred_location_country }}</dd></div>
+                {% endif %}
+                <div class="qa-cell"><dt>Remote</dt><dd>{{ "Open" if profile.open_to_remote else "Onsite" }}</dd></div>
+                {% if profile.min_total_comp_estimate_usd %}<div class="qa-cell"><dt>Min comp (USD)</dt><dd>${{ "{:,}".format(profile.min_total_comp_estimate_usd) }}</dd></div>{% endif %}
+            </dl>
+            {% if profile.core_skills %}
+            <div class="qa-skills"><span class="qa-skills-label">Skills:</span>
+                {% for s in profile.core_skills %}<a class="qa-skill" href="/skills/{{ s | lower | replace(' ', '-') }}">{{ s }}</a>{% endfor %}
+            </div>
+            {% endif %}
+            {% if profile.summary_for_recruiter %}
+            <p style="color: var(--color-text-secondary); margin-top: 0.75rem;">{{ profile.summary_for_recruiter }}</p>
+            {% endif %}
+            <p style="color: var(--color-text-muted); font-size: 0.8rem; margin-top: 0.75rem;">
+                {% if used_llm %}Parsed by Claude · {% endif %}Resume not stored.
+                <a href="/match-resume">Match another</a>
+            </p>
+        </section>
+
+        <section class="match-results">
+            {% if results %}
+            <h2>{{ results | length }} live match{{ "es" if results | length != 1 else "" }}</h2>
+            <div class="landing-list">
+                {% for j in results %}
+                <a href="/jobs/{{ j.id }}" class="job-card">
+                    <div class="job-card-title">{{ j.title }}</div>
+                    <div class="job-card-meta">
+                        <span class="job-card-emp">{{ j.employer_name }}</span>
+                        {% if j.location.city or j.location.country %}<span class="dot-sep">·</span><span>{{ j.location.city or j.location.country }}</span>{% endif %}
+                        {% if j.is_remote %}<span class="badge-remote">Remote</span>{% endif %}
+                        {% if j.salary.min %}<span class="dot-sep">·</span><span class="job-card-salary">{{ j.salary.currency or "USD" }} {{ "{:,}".format(j.salary.min) }}{% if j.salary.max and j.salary.max != j.salary.min %}–{{ "{:,}".format(j.salary.max) }}{% endif %}</span>{% endif %}
+                    </div>
+                    {% if j.why %}<div class="job-card-why">Why this matches: {{ j.why }}</div>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="match-empty">
+                <p>No matches right now for that profile.</p>
+                <p>Try <a href="/match">describing what you want directly</a>, or browse <a href="/industry">by industry</a>.</p>
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block content %}
+<div class="match-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+            <li><a href="/">Home</a></li>
+            <li aria-current="page">Alerts</li>
+        </ol>
+    </nav>
+
+    <header class="landing-head" style="text-align: center;">
+        <h1>Get job alerts in your inbox</h1>
+        <p class="landing-sub">Describe what you're looking for. We email you when new matching roles land. No account required.</p>
+    </header>
+
+    {% if status == "check_email" %}
+    <div class="alert-banner success">Check your inbox for a confirmation link. Nothing is sent until you confirm.</div>
+    {% elif status == "confirmed" %}
+    <div class="alert-banner success">Subscription confirmed. You'll get your first match email when new roles arrive.</div>
+    {% elif status == "unsubscribed" %}
+    <div class="alert-banner">Unsubscribed. You won't get any more emails for this alert.</div>
+    {% elif status == "invalid_email" %}
+    <div class="alert-banner error">That email address doesn't look valid.</div>
+    {% elif status == "missing_query" %}
+    <div class="alert-banner error">Please describe what kind of job you want alerts for.</div>
+    {% elif status == "bad_token" %}
+    <div class="alert-banner error">That link is invalid or expired.</div>
+    {% endif %}
+
+    <form method="post" action="/alerts/subscribe" class="alert-form">
+        <label for="alert-q">What jobs do you want alerts for?</label>
+        <input type="text" id="alert-q" name="query" placeholder="e.g. Remote senior backend engineer jobs paying over $150K" required>
+
+        <label for="alert-email">Your email</label>
+        <input type="email" id="alert-email" name="email" placeholder="you@example.com" required>
+
+        <label for="alert-cadence">How often?</label>
+        <select id="alert-cadence" name="cadence">
+            <option value="daily">Daily digest</option>
+            <option value="weekly">Weekly digest</option>
+            <option value="instant">As soon as a match appears</option>
+        </select>
+
+        <button type="submit">Send me alerts</button>
+        <p class="alert-foot">Free. Double opt-in. One-click unsubscribe in every email. We don't sell or share your address.</p>
+    </form>
+</div>
+{% endblock %}
