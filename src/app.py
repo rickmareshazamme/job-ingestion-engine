@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from src._version import __version__ as APP_VERSION
 from src.api.admin import router as admin_router
 from src.api.ai import router as ai_router
 from src.api.country import router as country_router
@@ -120,7 +121,7 @@ app = FastAPI(
         "appreciated, not required. Email `hello@zammejobs.com` to get on the AI "
         "lab allowlist."
     ),
-    version="0.8.1",
+    version=APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=TAGS_METADATA,
@@ -167,4 +168,4 @@ app.include_router(frontend_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "job-index", "version": "0.8.1"}
+    return {"status": "ok", "service": "job-index", "version": APP_VERSION}

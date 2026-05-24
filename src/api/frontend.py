@@ -32,6 +32,12 @@ logger = logging.getLogger("zammejobs.frontend")
 router = APIRouter(tags=["Frontend"])
 templates = Jinja2Templates(directory="src/templates")
 
+# Append ?v=<release> to every static asset URL so the browser drops
+# its cached copy whenever we ship. src/_version.py is the single
+# source of truth — bump it per release.
+from src._version import __version__ as _app_version
+templates.env.globals["asset_version"] = _app_version
+
 
 UTM_PARAMS = {
     "source": "zammejobs",
