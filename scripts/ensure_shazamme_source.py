@@ -61,11 +61,26 @@ def main() -> None:
         print(f"ensure_shazamme_source: {shazamme_jobs} Shazamme jobs already present, no dispatch", flush=True)
         return
 
-    # Kick off the first crawl via Celery so the worker — not the web
-    # boot path — actually downloads the 250MB feed.
-    from src.tasks.crawl import crawl_source
-    crawl_source.delay(source_id)
-    print(f"ensure_shazamme_source: dispatched crawl_source for {source_id}", flush=True)
+    # Spawn the import as a detached subprocess so the web container
+    # finishes booting in milliseconds while the 250MB feed downloads
+    # in the background. We bypass Celery (v0.7.1 dispatch never
+    # actually picked up — likely Redis env mismatch from the web
+    # process) and run scripts.import_shazamme directly.
+    import os
+    import subprocess
+    log_path = "/tmp/shazamme_import.log"
+    proc = subprocess.Popen(
+        ["python3", "-m", "scripts.import_shazamme"],
+        stdout=open(log_path, "ab"),
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        env=os.environ.copy(),
+    )
+    print(
+        f"ensure_shazamme_source: launched scripts.import_shazamme pid={proc.pid}, "
+        f"logging to {log_path}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

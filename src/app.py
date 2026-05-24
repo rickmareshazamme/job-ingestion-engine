@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from src.api.admin import router as admin_router
 from src.api.ai import router as ai_router
 from src.api.country import router as country_router
 from src.api.data import router as data_router
@@ -119,7 +120,7 @@ app = FastAPI(
         "appreciated, not required. Email `hello@zammejobs.com` to get on the AI "
         "lab allowlist."
     ),
-    version="0.7.1",
+    version="0.7.2",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=TAGS_METADATA,
@@ -158,6 +159,7 @@ app.include_router(data_router)
 app.include_router(map_router)
 app.include_router(legal_router)
 app.include_router(linkedin_feed_router)
+app.include_router(admin_router)
 
 # Frontend routes (must be last — catches / and /search)
 app.include_router(frontend_router)
@@ -165,4 +167,4 @@ app.include_router(frontend_router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "job-index", "version": "0.7.1"}
+    return {"status": "ok", "service": "job-index", "version": "0.7.2"}

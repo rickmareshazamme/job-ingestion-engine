@@ -95,6 +95,15 @@ async def main():
 
     logger.info("Shazamme import done: %d new, %d updated, %d errors", new, upd, errs)
 
+    # Flip visibility now that Shazamme jobs are in the DB. Without this
+    # the gate only kicks in on the next web boot.
+    if new > 0 or upd > 0:
+        try:
+            from scripts.sync_shazamme_visibility import main as sync_visibility
+            sync_visibility()
+        except Exception as e:
+            logger.warning("Post-import visibility sync failed: %s", str(e)[:200])
+
     # Best-effort AI ping for new URLs
     if new_urls:
         try:
