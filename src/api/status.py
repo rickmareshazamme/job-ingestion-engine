@@ -37,11 +37,14 @@ async def _gather(session: AsyncSession) -> dict:
     active = (await session.execute(
         select(func.count()).select_from(Job).where(Job.status == "active")
     )).scalar() or 0
+    # Both metrics scope to currently-visible jobs so the % can't exceed 100.
     fresh_24h = (await session.execute(
-        select(func.count()).select_from(Job).where(Job.date_updated >= h24)
+        select(func.count()).select_from(Job)
+        .where(Job.status == "active", Job.date_updated >= h24)
     )).scalar() or 0
     new_7d = (await session.execute(
-        select(func.count()).select_from(Job).where(Job.date_crawled >= d7)
+        select(func.count()).select_from(Job)
+        .where(Job.status == "active", Job.date_crawled >= d7)
     )).scalar() or 0
     sources = (await session.execute(
         select(func.count()).select_from(SourceConfig).where(SourceConfig.is_active == True)

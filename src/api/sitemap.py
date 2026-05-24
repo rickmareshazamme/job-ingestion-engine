@@ -200,43 +200,63 @@ async def sitemap_landing(request: Request, session: AsyncSession = Depends(get_
     search engines crawl every long-tail landing page we generate."""
     from src.api.landing import slugify
 
-    base = str(request.base_url).rstrip("/")
+    # Force HTTPS on sitemap URLs — Google/Bing dedupe http vs https as
+    # distinct URLs, and we're https-only behind Railway's edge.
+    base = "https://www.zammejobs.com"
     urls: list[str] = []
 
-    # Top roles by job count — take the first category from each active job.
+    # Junk values the Shazamme feed dumps into <category> that aren't
+    # actually job titles — pipeline/workflow status, internal tags.
+    JUNK_ROLES = {
+        "no", "on-hold", "accepting-candidates", "open", "closed", "draft",
+        "active", "inactive", "internal", "external", "various",
+        "n-a", "na", "tbd", "tbc", "other", "general", "misc",
+    }
+
     role_rows = (await session.execute(
         select(func.unnest(Job.categories).label("cat"), func.count().label("n"))
         .where(Job.status == "active")
         .group_by("cat")
         .order_by(func.count().desc())
-        .limit(150)
+        .limit(300)
     )).all()
     role_slugs = []
     for cat, n in role_rows:
         if not cat or n < 5:
             continue
         s = slugify(cat)
-        if s and s not in role_slugs:
-            role_slugs.append(s)
-            urls.append(f"{base}/jobs/role/{s}")
-            urls.append(f"{base}/salaries/{s}")
+        # Skip junk + sub-3-char slugs ("hr", "it" still pass via 3-char min
+        # — these are too ambiguous for the role page to be useful).
+        if not s or len(s) < 4 or s in JUNK_ROLES:
+            continue
+        if s in role_slugs:
+            continue
+        role_slugs.append(s)
+        urls.append(f"{base}/jobs/role/{s}")
+        urls.append(f"{base}/salaries/{s}")
+        if len(role_slugs) >= 150:
+            break
 
-    # Top cities by job count.
     city_rows = (await session.execute(
         select(Job.location_city, func.count().label("n"))
         .where(Job.status == "active", Job.location_city.isnot(None))
         .group_by(Job.location_city)
         .order_by(func.count().desc())
-        .limit(150)
+        .limit(300)
     )).all()
     city_slugs = []
     for city, n in city_rows:
         if not city or n < 5:
             continue
         s = slugify(city)
-        if s and s not in city_slugs:
-            city_slugs.append(s)
-            urls.append(f"{base}/jobs/in/{s}")
+        if not s or len(s) < 3:
+            continue
+        if s in city_slugs:
+            continue
+        city_slugs.append(s)
+        urls.append(f"{base}/jobs/in/{s}")
+        if len(city_slugs) >= 150:
+            break
 
     # Cross-product top-N (capped to avoid explosion).
     for r in role_slugs[:30]:
