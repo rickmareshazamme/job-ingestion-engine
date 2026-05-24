@@ -41,13 +41,10 @@ def import_shazamme(x_admin_token: str | None = Header(default=None)):
 
 
 @router.get("/shazamme-status")
-async def shazamme_status(
-    x_admin_token: str | None = Header(default=None),
-    session: AsyncSession = Depends(get_session),
-):
-    """Snapshot of the Shazamme ingestion state."""
-    _check_token(x_admin_token)
-
+async def shazamme_status(session: AsyncSession = Depends(get_session)):
+    """Snapshot of the Shazamme ingestion state. Read-only, no auth — same
+    counts are already exposed on /api/v1/stats; this endpoint just
+    breaks them out by source_type and tails the import log."""
     sc_count = (await session.execute(
         select(func.count()).select_from(SourceConfig)
         .where(SourceConfig.source_type == "shazamme_feed")
