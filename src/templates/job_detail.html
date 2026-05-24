@@ -108,7 +108,7 @@
             {% endif %}
 
             {% if job.source_url %}
-            <a href="/apply/{{ job.id }}" target="_blank" rel="noopener" class="apply-button apply-button-top">
+            <a href="/apply/{{ job.id }}" target="_blank" rel="noopener noreferrer" class="apply-button apply-button-top">
                 Apply direct
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
             </a>
@@ -133,7 +133,7 @@
             {% endif %}
 
             {% if job.source_url %}
-            <a href="/apply/{{ job.id }}" target="_blank" rel="noopener" class="apply-button">
+            <a href="/apply/{{ job.id }}" target="_blank" rel="noopener noreferrer" class="apply-button">
                 Apply direct
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7m0 0H7m10 0v10"/></svg>
             </a>
@@ -169,7 +169,7 @@
                     {% endif %}
                 </div>
                 {% if employer_panel.career_page_url %}
-                <a href="{{ employer_panel.career_page_url }}" target="_blank" rel="noopener" class="side-link">Visit career page &rarr;</a>
+                <a href="{{ employer_panel.career_page_url }}" target="_blank" rel="noopener noreferrer" class="side-link">Visit career page &rarr;</a>
                 {% endif %}
             </div>
             {% endif %}
