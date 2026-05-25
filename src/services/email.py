@@ -43,11 +43,16 @@ _NAME_ADDR_RE = re.compile(r"^\s*(?P<name>.*?)\s*<\s*(?P<email>[^>]+?)\s*>\s*$")
 
 def _parse_from(raw: str) -> dict:
     """Accept either 'foo@bar.com' or 'Display Name <foo@bar.com>' and
-    return SendGrid's {email, name?} shape."""
+    return SendGrid's {email, name?} shape.
+
+    Defensively strips surrounding quotes / whitespace because Railway's
+    env-var UI sometimes captures the literal '"' if a user pastes a
+    quoted value."""
+    raw = (raw or "").strip().strip('"').strip("'").strip()
     m = _NAME_ADDR_RE.match(raw)
     if m:
-        return {"email": m.group("email"), "name": m.group("name")}
-    return {"email": raw.strip()}
+        return {"email": m.group("email").strip(), "name": m.group("name").strip()}
+    return {"email": raw}
 
 
 async def send_email(
@@ -78,6 +83,10 @@ async def send_email(
             {"type": "text/html", "value": html},
         ]
 
+    # Strip whitespace defensively — Railway env values sometimes carry
+    # trailing newlines that break the Authorization header.
+    api_key = api_key.strip()
+
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:
             resp = await client.post(
@@ -86,9 +95,14 @@ async def send_email(
                 json=body,
             )
             if resp.status_code >= 300:
-                logger.warning("SendGrid send failed status=%d body=%s", resp.status_code, resp.text[:300])
+                logger.warning(
+                    "SendGrid send failed status=%d body=%s from=%r to=%s",
+                    resp.status_code, resp.text[:400],
+                    body.get("from"), to,
+                )
                 return False
+            logger.info("SendGrid send OK to=%s subject=%r status=%d", to, subject, resp.status_code)
             return True
         except Exception as e:
-            logger.warning("SendGrid send error: %s", e)
+            logger.warning("SendGrid send error: %s (to=%s)", e, to)
             return False

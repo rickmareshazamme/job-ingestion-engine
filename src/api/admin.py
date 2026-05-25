@@ -98,3 +98,55 @@ async def shazamme_status(session: AsyncSession = Depends(get_session)):
         "shazamme_only_ingestion": settings.shazamme_only_ingestion,
         "log_tail": log_tail,
     }
+
+
+@router.get("/email-config", include_in_schema=False)
+def email_config(x_admin_token: str | None = Header(default=None)):
+    """Diagnostic — confirm which of the email-related env vars are set
+    on THIS process (web service). Returns booleans + lengths only;
+    never echoes the actual key values.
+
+    To check the beat service, hit this from a Railway shell into beat
+    (or temporarily expose beat over HTTP)."""
+    _check_token(x_admin_token)
+    sg = os.environ.get("SENDGRID_API_KEY") or ""
+    secret = os.environ.get("APP_SECRET_KEY") or ""
+    anth = os.environ.get("ANTHROPIC_API_KEY") or ""
+    return {
+        "sendgrid_api_key_set": bool(sg),
+        "sendgrid_api_key_len": len(sg),
+        "sendgrid_api_key_prefix": (sg[:3] + "…") if sg else None,
+        "email_from": os.environ.get("EMAIL_FROM") or "(default) ZammeJobs <alerts@zammejobs.com>",
+        "app_secret_key_set": bool(secret),
+        "app_secret_key_len": len(secret),
+        "app_secret_key_is_dev_default": secret == "" or secret == "dev-secret-do-not-use-in-prod",
+        "anthropic_api_key_set": bool(anth),
+        "anthropic_api_key_len": len(anth),
+        "resend_api_key_set_legacy": bool(os.environ.get("RESEND_API_KEY")),  # warn if old var still hanging around
+    }
+
+
+@router.post("/email-test", include_in_schema=False)
+async def email_test(
+    to: str,
+    x_admin_token: str | None = Header(default=None),
+):
+    """Send a one-off test email to `to`. Returns the boolean result
+    and a hint if it failed."""
+    _check_token(x_admin_token)
+    from src.services.email import send_email
+    html = """<!doctype html><html><body style="font-family:-apple-system,sans-serif;padding:24px;color:#111;">
+<h2 style="color:#EC008C;">ZammeJobs email pipeline test</h2>
+<p>If you're reading this, SendGrid + Railway env vars + DNS are all wired correctly.</p>
+<p style="color:#6b7280;font-size:13px;">Sent at deploy time from /api/v1/admin/email-test.</p>
+</body></html>"""
+    ok = await send_email(to, "ZammeJobs — test email", html)
+    return {
+        "sent": ok,
+        "hint": None if ok else (
+            "Check: SENDGRID_API_KEY env is set on the web service, "
+            "domain authentication is verified in SendGrid, and EMAIL_FROM "
+            "uses a verified sender. Also check the web service logs for "
+            "'SendGrid send failed' or 'send_email skipped' lines."
+        ),
+    }
