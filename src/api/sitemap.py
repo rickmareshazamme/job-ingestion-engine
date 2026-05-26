@@ -49,7 +49,7 @@ AI_ALLOWLIST = [
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     blocks = [f"# ZammeJobs — every job, AI-indexable. Crawl us!"]
     for bot in AI_ALLOWLIST:
         blocks.append(f"\nUser-agent: {bot}\nAllow: /\nCrawl-delay: 0")
@@ -62,7 +62,7 @@ async def robots_txt(request: Request):
 
 @router.get("/humans.txt", response_class=PlainTextResponse, summary="humans.txt — credits + contact")
 async def humans_txt(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     return f"""/* TEAM */
 ZammeJobs — global AI-native job index.
 Site:    {base}
@@ -88,7 +88,7 @@ Email hello@zammejobs.com. We answer.
 
 @router.get("/ai.txt", response_class=PlainTextResponse, summary="ai.txt — AI usage policy")
 async def ai_txt(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     return f"""# ai.txt — ZammeJobs AI usage policy
 # {base}
 # Spec inspiration: https://site.spawning.ai/spawning-ai-txt
@@ -183,7 +183,7 @@ async def indexnow_key_file():
 
 @router.get("/sitemap.xml", response_class=Response)
 async def sitemap_index(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap><loc>{base}/sitemap-jobs.xml</loc></sitemap>
@@ -277,7 +277,7 @@ async def sitemap_jobs(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     result = await session.execute(
         select(Job.id, Job.date_updated)
         .where(Job.status == "active")
@@ -311,7 +311,7 @@ async def sitemap_employers(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ):
-    base = str(request.base_url).rstrip("/")
+    base = "https://www.zammejobs.com"
     result = await session.execute(
         select(Employer.id, Employer.updated_at)
         .order_by(Employer.updated_at.desc().nullslast())
