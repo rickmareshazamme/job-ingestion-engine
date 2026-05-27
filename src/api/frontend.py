@@ -20,7 +20,7 @@ import aiohttp
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.schemas import JobLocation, JobSalary, JobSummary
@@ -769,9 +769,22 @@ async def employers_page(
     result = await session.execute(stmt)
     rows = result.all()
 
+    ids = [row[0].id for row in rows]
+    slugs_by_id: dict[str, str] = {}
+    if ids:
+        try:
+            slug_result = await session.execute(
+                text("SELECT id::text, slug FROM employers WHERE id = ANY(:ids) AND slug IS NOT NULL"),
+                {"ids": [str(i) for i in ids]},
+            )
+            slugs_by_id = {r[0]: r[1] for r in slug_result.all()}
+        except Exception as e:
+            logger.warning("slug fetch failed (column may be missing): %s", e)
+
     employers = [
         {
             "id": str(row[0].id),
+            "slug": slugs_by_id.get(str(row[0].id)) or str(row[0].id),
             "name": row[0].name,
             "domain": row[0].domain,
             "logo_url": row[0].logo_url,
@@ -790,22 +803,55 @@ async def employers_page(
     })
 
 
-@router.get("/employers/{employer_id}", response_class=HTMLResponse)
+@router.get("/employers/{slug}", response_class=HTMLResponse)
 async def employer_detail(
     request: Request,
-    employer_id: str,
+    slug: str,
     page: int = Query(1, ge=1),
     per_page: int = 20,
     session: AsyncSession = Depends(get_session),
 ):
-    """Single-employer page: company info + their active job listings."""
-    try:
-        uid = UUID(employer_id)
-    except ValueError:
-        return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
+    """Single-employer page: company info + their active job listings.
 
-    emp_result = await session.execute(select(Employer).where(Employer.id == uid))
-    employer = emp_result.scalar_one_or_none()
+    Accepts either the human-readable slug (preferred) or a legacy UUID id.
+    Legacy UUID URLs 301-redirect to the canonical slug URL when a slug
+    is available. Slug lookups are wrapped in try/except so the route
+    keeps working even if the slug column hasn't been migrated yet.
+    """
+    employer = None
+    uid = None
+    try:
+        uid = UUID(slug)
+    except ValueError:
+        pass
+
+    if uid is not None:
+        emp_result = await session.execute(select(Employer).where(Employer.id == uid))
+        employer = emp_result.scalar_one_or_none()
+        if employer:
+            canonical_slug = None
+            try:
+                canonical = await session.execute(
+                    text("SELECT slug FROM employers WHERE id = :id"), {"id": uid}
+                )
+                canonical_slug = canonical.scalar_one_or_none()
+            except Exception as e:
+                logger.warning("slug lookup failed: %s", e)
+            if canonical_slug and canonical_slug != slug:
+                return RedirectResponse(f"/employers/{canonical_slug}", status_code=301)
+    else:
+        try:
+            id_result = await session.execute(
+                text("SELECT id FROM employers WHERE slug = :slug LIMIT 1"), {"slug": slug}
+            )
+            slug_id = id_result.scalar_one_or_none()
+            if slug_id:
+                emp_result = await session.execute(select(Employer).where(Employer.id == slug_id))
+                employer = emp_result.scalar_one_or_none()
+                uid = slug_id
+        except Exception as e:
+            logger.warning("slug-to-id lookup failed: %s", e)
+
     if not employer:
         return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
 

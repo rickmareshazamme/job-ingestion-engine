@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
@@ -312,19 +312,26 @@ async def sitemap_employers(
     session: AsyncSession = Depends(get_session),
 ):
     base = "https://www.zammejobs.com"
-    result = await session.execute(
-        select(Employer.id, Employer.updated_at)
-        .order_by(Employer.updated_at.desc().nullslast())
-        .limit(50000)
-    )
-    employers = result.all()
+    try:
+        result = await session.execute(
+            text("SELECT id::text, slug, updated_at FROM employers ORDER BY updated_at DESC NULLS LAST LIMIT 50000")
+        )
+        employers = [(r[0], r[1], r[2]) for r in result.all()]
+    except Exception:
+        # slug column may not exist yet — fall back to id-only URLs
+        result = await session.execute(
+            select(Employer.id, Employer.updated_at)
+            .order_by(Employer.updated_at.desc().nullslast())
+            .limit(50000)
+        )
+        employers = [(str(r[0]), None, r[1]) for r in result.all()]
 
     urls = [f'  <url><loc>{base}/employers</loc><changefreq>daily</changefreq><priority>0.6</priority></url>']
-    for emp_id, updated_at in employers:
+    for emp_id, slug, updated_at in employers:
         lastmod = updated_at.strftime("%Y-%m-%d") if updated_at else ""
         urls.append(
             f"  <url>\n"
-            f"    <loc>{base}/employers/{emp_id}</loc>\n"
+            f"    <loc>{base}/employers/{slug or emp_id}</loc>\n"
             f"    <lastmod>{lastmod}</lastmod>\n"
             f"    <changefreq>weekly</changefreq>\n"
             f"    <priority>0.5</priority>\n"

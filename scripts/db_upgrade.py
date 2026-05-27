@@ -38,7 +38,17 @@ def main() -> None:
 
     print("db_upgrade: running alembic upgrade head", flush=True)
     command.upgrade(cfg, "head")
-    print("db_upgrade: done", flush=True)
+
+    # Re-read alembic_version so logs show exactly where we landed.
+    try:
+        from sqlalchemy import text as sql_text
+        engine2 = create_engine(settings.database_url_sync)
+        with engine2.connect() as conn:
+            rev = conn.execute(sql_text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+        engine2.dispose()
+        print(f"db_upgrade: done, alembic_version = {rev}", flush=True)
+    except Exception as e:
+        print(f"db_upgrade: done (could not read alembic_version: {e})", flush=True)
 
 
 if __name__ == "__main__":

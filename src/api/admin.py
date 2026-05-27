@@ -6,7 +6,7 @@ import os
 import subprocess
 
 from fastapi import APIRouter, Header, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends
 
@@ -54,6 +54,53 @@ def indexnow_bulk(x_admin_token: str | None = Header(default=None)):
         env=os.environ.copy(),
     )
     return {"status": "dispatched", "pid": proc.pid, "log_path": log_path}
+
+
+@router.get("/db-schema")
+async def db_schema(session: AsyncSession = Depends(get_session)):
+    """Live DB schema snapshot. No auth — reveals only column metadata,
+    no row data. Use to confirm migrations applied."""
+    alembic_version = None
+    try:
+        r = await session.execute(text("SELECT version_num FROM alembic_version"))
+        alembic_version = r.scalar_one_or_none()
+    except Exception as e:
+        alembic_version = f"<error: {e}>"
+
+    cols = []
+    try:
+        r = await session.execute(text(
+            "SELECT column_name, data_type, is_nullable "
+            "FROM information_schema.columns WHERE table_name = 'employers' "
+            "ORDER BY ordinal_position"
+        ))
+        cols = [{"name": row[0], "type": row[1], "nullable": row[2]} for row in r.all()]
+    except Exception as e:
+        cols = [{"error": str(e)}]
+
+    triggers = []
+    try:
+        r = await session.execute(text(
+            "SELECT trigger_name FROM information_schema.triggers "
+            "WHERE event_object_table = 'employers'"
+        ))
+        triggers = [row[0] for row in r.all()]
+    except Exception as e:
+        triggers = [f"<error: {e}>"]
+
+    slug_count = None
+    try:
+        r = await session.execute(text("SELECT COUNT(*) FROM employers WHERE slug IS NOT NULL"))
+        slug_count = r.scalar_one_or_none()
+    except Exception as e:
+        slug_count = f"<error: {e}>"
+
+    return {
+        "alembic_version": alembic_version,
+        "employers_columns": cols,
+        "employers_triggers": triggers,
+        "employers_with_slug": slug_count,
+    }
 
 
 @router.get("/shazamme-status")
