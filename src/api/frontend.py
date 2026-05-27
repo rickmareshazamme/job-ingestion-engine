@@ -772,6 +772,7 @@ async def employers_page(
     employers = [
         {
             "id": str(row[0].id),
+            "slug": row[0].slug or str(row[0].id),
             "name": row[0].name,
             "domain": row[0].domain,
             "logo_url": row[0].logo_url,
@@ -790,24 +791,33 @@ async def employers_page(
     })
 
 
-@router.get("/employers/{employer_id}", response_class=HTMLResponse)
+@router.get("/employers/{slug}", response_class=HTMLResponse)
 async def employer_detail(
     request: Request,
-    employer_id: str,
+    slug: str,
     page: int = Query(1, ge=1),
     per_page: int = 20,
     session: AsyncSession = Depends(get_session),
 ):
-    """Single-employer page: company info + their active job listings."""
-    try:
-        uid = UUID(employer_id)
-    except ValueError:
-        return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
+    """Single-employer page: company info + their active job listings.
 
-    emp_result = await session.execute(select(Employer).where(Employer.id == uid))
-    employer = emp_result.scalar_one_or_none()
+    Accepts either the human-readable slug (preferred) or a legacy UUID id.
+    Legacy UUID URLs 301-redirect to the canonical slug URL.
+    """
+    employer = None
+    try:
+        uid = UUID(slug)
+        emp_result = await session.execute(select(Employer).where(Employer.id == uid))
+        employer = emp_result.scalar_one_or_none()
+        if employer and employer.slug and employer.slug != slug:
+            return RedirectResponse(f"/employers/{employer.slug}", status_code=301)
+    except ValueError:
+        emp_result = await session.execute(select(Employer).where(Employer.slug == slug))
+        employer = emp_result.scalar_one_or_none()
+
     if not employer:
         return HTMLResponse("<h1>Employer not found</h1>", status_code=404)
+    uid = employer.id
 
     # Active jobs at this employer
     count_stmt = (
