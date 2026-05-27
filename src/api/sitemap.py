@@ -313,18 +313,18 @@ async def sitemap_employers(
 ):
     base = "https://www.zammejobs.com"
     result = await session.execute(
-        select(Employer.id, Employer.slug, Employer.updated_at)
+        select(Employer.id, Employer.updated_at)
         .order_by(Employer.updated_at.desc().nullslast())
         .limit(50000)
     )
     employers = result.all()
 
     urls = [f'  <url><loc>{base}/employers</loc><changefreq>daily</changefreq><priority>0.6</priority></url>']
-    for emp_id, slug, updated_at in employers:
+    for emp_id, updated_at in employers:
         lastmod = updated_at.strftime("%Y-%m-%d") if updated_at else ""
         urls.append(
             f"  <url>\n"
-            f"    <loc>{base}/employers/{slug or emp_id}</loc>\n"
+            f"    <loc>{base}/employers/{emp_id}</loc>\n"
             f"    <lastmod>{lastmod}</lastmod>\n"
             f"    <changefreq>weekly</changefreq>\n"
             f"    <priority>0.5</priority>\n"

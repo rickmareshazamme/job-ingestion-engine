@@ -24,7 +24,6 @@ class Employer(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(Text, nullable=False)
-    slug = Column(Text, unique=True, nullable=False, index=True)
     domain = Column(Text, unique=True, nullable=False)
     logo_url = Column(Text)
     ats_platform = Column(Text)

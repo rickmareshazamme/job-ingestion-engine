@@ -16,7 +16,7 @@
 
 <div class="employer-grid">
     {% for emp in employers %}
-    <a class="employer-card" href="/employers/{{ emp.slug or emp.id }}" style="text-decoration: none;">
+    <a class="employer-card" href="/employers/{{ emp.id }}" style="text-decoration: none;">
         <h3>{{ emp.name }}</h3>
         <span class="domain">{{ emp.domain }}</span>
         {% if emp.ats_platform %}
