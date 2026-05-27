@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block meta_description %}{{ description }}{% endblock %}
+
+{% block head_extra %}
+<link rel="canonical" href="{{ canonical_url }}" />
+<script type="application/ld+json">{{ json_ld | safe }}</script>
+{% endblock %}
+
+{% block content %}
+<section class="intent-page">
+  <header class="intent-head">
+    <h1>High-intent job searches</h1>
+    <p class="lead">{{ description }}</p>
+  </header>
+
+  <div class="intent-grid">
+    {% for item in items %}
+    <a class="intent-card" href="{{ item.path }}">
+      <span class="intent-label">{{ item.label }}</span>
+      {% if item.count %}<span class="intent-count">{{ "{:,}".format(item.count) }} live</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<style>
+  .intent-page { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
+  .intent-head { margin-bottom: 1.5rem; }
+  .intent-head h1 { font-size: var(--text-2xl); margin-bottom: 0.5rem; }
+  .intent-head .lead { color: var(--color-text-secondary); }
+
+  .intent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem;
+  }
+  .intent-card {
+    display: flex; flex-direction: column; gap: 0.25rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-card);
+    transition: border-color 120ms ease, transform 120ms ease;
+  }
+  .intent-card:hover { border-color: var(--color-accent); transform: translateY(-1px); }
+  .intent-label { font-weight: 600; }
+  .intent-count { color: var(--color-text-muted); font-size: var(--text-sm); }
+</style>
+{% endblock %}

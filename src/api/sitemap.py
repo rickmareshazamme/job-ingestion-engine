@@ -189,6 +189,7 @@ async def sitemap_index(request: Request):
   <sitemap><loc>{base}/sitemap-jobs.xml</loc></sitemap>
   <sitemap><loc>{base}/sitemap-employers.xml</loc></sitemap>
   <sitemap><loc>{base}/sitemap-landing.xml</loc></sitemap>
+  <sitemap><loc>{base}/sitemap-intent.xml</loc></sitemap>
   <sitemap><loc>{base}/sitemap-static.xml</loc></sitemap>
 </sitemapindex>"""
     return Response(content=xml, media_type="application/xml")
@@ -265,6 +266,30 @@ async def sitemap_landing(request: Request, session: AsyncSession = Depends(get_
             urls.append(f"{base}/jobs/{r}-in-{c}")
 
     body = "\n".join(f"  <url><loc>{u}</loc></url>" for u in urls)
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{body}
+</urlset>"""
+    return Response(content=xml, media_type="application/xml")
+
+
+@router.get("/sitemap-intent.xml", response_class=Response)
+async def sitemap_intent(request: Request):
+    """Curated high-intent landing pages (Nursing in Australia, Mining in WA,
+    etc.). Static list so these always make it into the sitemap even if the
+    underlying jobs haven't crossed the threshold the auto-landing crawl uses.
+    """
+    from src.api.landing import CURATED_INTENT_PAGES
+
+    base = "https://www.zammejobs.com"
+    urls = [f"{base}/jobs/intent"]
+    for entry in CURATED_INTENT_PAGES:
+        urls.append(f"{base}/jobs/{entry['slug']}")
+
+    body = "\n".join(
+        f"  <url><loc>{u}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>"
+        for u in urls
+    )
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 {body}

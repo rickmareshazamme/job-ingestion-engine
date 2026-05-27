@@ -44,8 +44,11 @@ async def main():
 
     new = upd = errs = 0
     new_urls: list[str] = []
+    seen_source_ids: set[str] = set()
 
     for raw in raw_jobs:
+        if raw.source_id:
+            seen_source_ids.add(raw.source_id)
         try:
             job = await normalize_job(raw, do_geocode=False)
         except Exception as e:
@@ -95,6 +98,34 @@ async def main():
 
     logger.info("Shazamme import done: %d new, %d updated, %d errors", new, upd, errs)
 
+    # Lifecycle: any active shazamme_feed job NOT in this fetch is no longer
+    # live. Mark expired + notify Google/IndexNow so the URL drops out.
+    expired_urls: list[str] = []
+    if seen_source_ids:
+        from sqlalchemy import select, update as sa_update
+        from datetime import datetime as _dt
+        with Session() as s:
+            stale_rows = s.execute(
+                select(Job.id, Job.source_id)
+                .where(Job.source_type == "shazamme_feed")
+                .where(Job.status == "active")
+            ).all()
+            stale_ids = [
+                row[0] for row in stale_rows
+                if row[1] and row[1] not in seen_source_ids
+            ]
+            if stale_ids:
+                s.execute(
+                    sa_update(Job)
+                    .where(Job.id.in_(stale_ids))
+                    .values(status="expired", date_updated=_dt.utcnow())
+                )
+                s.commit()
+                expired_urls = [
+                    f"https://{settings.site_domain}/jobs/{jid}" for jid in stale_ids
+                ]
+                logger.info("Expired %d Shazamme jobs no longer in feed", len(stale_ids))
+
     # Flip visibility now that Shazamme jobs are in the DB. Without this
     # the gate only kicks in on the next web boot.
     if new > 0 or upd > 0:
@@ -118,6 +149,38 @@ async def main():
         logger.info("Launched indexnow_bulk_submit in background")
     except Exception as e:
         logger.warning("IndexNow dispatch failed: %s", str(e)[:120])
+
+    # Google Indexing API: tell Googlebot to crawl every brand-new job URL,
+    # and notify removals for jobs that just dropped out of the feed. Free
+    # quota is 200 URL submissions/day per GCP project — split the budget.
+    if new_urls or expired_urls:
+        try:
+            from src.indexing.google import notify_url_deleted, notify_url_updated
+            new_count = del_count = 0
+            for u in new_urls[:150]:
+                if await notify_url_updated(u):
+                    new_count += 1
+            for u in expired_urls[:50]:
+                if await notify_url_deleted(u):
+                    del_count += 1
+            if new_count or del_count:
+                logger.info(
+                    "Google Indexing API: %d URL_UPDATED, %d URL_DELETED",
+                    new_count, del_count,
+                )
+        except Exception as e:
+            logger.warning("Google Indexing API dispatch failed: %s", str(e)[:120])
+
+    # IndexNow accepts both creates and removals (a 404/410 at the URL is
+    # enough for Bing to drop it). Submit expiries in the same batch shape.
+    if expired_urls:
+        try:
+            from src.indexing.indexnow import submit_urls as indexnow_submit
+            submitted = await indexnow_submit(expired_urls)
+            if submitted:
+                logger.info("IndexNow: submitted %d expired URLs", submitted)
+        except Exception as e:
+            logger.warning("IndexNow expiry dispatch failed: %s", str(e)[:120])
 
 
 if __name__ == "__main__":

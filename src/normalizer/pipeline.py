@@ -19,7 +19,7 @@ from src.normalizer.classification import (
 )
 from src.normalizer.dedup import generate_content_hash
 from src.normalizer.location import ParsedLocation, geocode, parse_location
-from src.normalizer.salary import parse_salary
+from src.normalizer.salary import currency_for_country, parse_salary
 
 
 def strip_html(html: str) -> str:
@@ -74,8 +74,11 @@ async def normalize_job(raw: RawJob, do_geocode: bool = True) -> Job:
     if do_geocode and (location.city or raw.location_raw):
         location = await geocode(location, raw.location_raw or "")
 
-    # 4. Parse salary
+    # 4. Parse salary. When the raw string lacks a currency symbol, fall
+    # back to the country-derived currency so AU jobs aren't tagged USD.
     salary = parse_salary(raw.salary_raw or "")
+    if salary.min_value and not salary.currency:
+        salary.currency = currency_for_country(location.country) or "USD"
 
     # 5. Employment type
     employment_type = classify_employment_type(raw.employment_type_raw)

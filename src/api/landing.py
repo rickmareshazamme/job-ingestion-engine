@@ -54,6 +54,16 @@ def slug_to_phrase(slug: str) -> str:
     return " ".join(p.capitalize() for p in slug.split("-") if p)
 
 
+_COUNTRY_SLUG_TO_ISO = {
+    "australia": "AU", "new-zealand": "NZ", "united-kingdom": "GB", "uk": "GB",
+    "united-states": "US", "usa": "US", "us": "US",
+    "canada": "CA", "ireland": "IE", "germany": "DE", "france": "FR",
+    "netherlands": "NL", "spain": "ES", "italy": "IT", "singapore": "SG",
+    "hong-kong": "HK", "japan": "JP", "india": "IN", "south-africa": "ZA",
+    "brazil": "BR", "mexico": "MX",
+}
+
+
 def _role_match_clause(role_slug: str):
     """SQL clause for matching jobs against a role slug.
 
@@ -74,14 +84,44 @@ def _role_match_clause(role_slug: str):
 
 
 def _city_match_clause(city_slug: str):
-    """Same tokenize-and-match strategy as _role_match_clause — city
-    slugs lose punctuation too (e.g. "st-petersburg" vs "St. Petersburg")."""
-    tokens = [t for t in city_slug.split("-") if t and len(t) >= 2]
-    if not tokens:
+    """Match a place-slug against city, state, country, or location_raw.
+
+    City slugs lose punctuation too (e.g. "st-petersburg" vs "St. Petersburg"),
+    so we tokenize. We also treat the whole slug as a country name (so
+    "australia" matches location_country='AU') and as a state name (so
+    "western-australia" matches location_state ILIKE 'western australia').
+    """
+    if not city_slug:
         return Job.id.is_(None)
-    per_token = [or_(Job.location_city.ilike(f"%{t}%"), Job.location_raw.ilike(f"%{t}%"))
-                 for t in tokens]
-    return and_(*per_token)
+
+    or_parts: list = []
+
+    # Country-name fast path.
+    iso = _COUNTRY_SLUG_TO_ISO.get(city_slug.lower())
+    if iso:
+        or_parts.append(Job.location_country == iso)
+
+    # State-name fast path: match the de-slugged phrase against location_state.
+    phrase = slug_to_phrase(city_slug)
+    if phrase:
+        or_parts.append(Job.location_state.ilike(f"%{phrase}%"))
+
+    # Per-token fallback against city / raw / state / country-name.
+    tokens = [t for t in city_slug.split("-") if t and len(t) >= 2]
+    if tokens:
+        per_token = [
+            or_(
+                Job.location_city.ilike(f"%{t}%"),
+                Job.location_raw.ilike(f"%{t}%"),
+                Job.location_state.ilike(f"%{t}%"),
+            )
+            for t in tokens
+        ]
+        or_parts.append(and_(*per_token))
+
+    if not or_parts:
+        return Job.id.is_(None)
+    return or_(*or_parts)
 
 
 async def _matching_jobs(
@@ -92,6 +132,15 @@ async def _matching_jobs(
     limit: int = 50,
 ):
     clauses = [Job.status == "active"]
+    # "remote-<role>" prefix is a high-intent SEO pattern (e.g.
+    # /jobs/remote-technology-in-australia). Strip the prefix and add a
+    # remote filter so the page actually only lists remote roles.
+    remote_only = False
+    if role_slug and role_slug.startswith("remote-"):
+        remote_only = True
+        role_slug = role_slug[len("remote-"):] or role_slug
+    if remote_only:
+        clauses.append(Job.is_remote.is_(True))
     if role_slug:
         clauses.append(_role_match_clause(role_slug))
     if city_slug:
@@ -179,7 +228,7 @@ def _faqs_role_city(role: str, city: Optional[str], country: Optional[str], tota
         },
         {
             "q": "How fresh are the listings?",
-            "a": "ZammeJobs pulls the Shazamme partner feed every 12 hours and drops expired roles automatically. Filled positions disappear within a day.",
+            "a": "ZammeJobs pulls the Shazamme partner feed every few hours and drops expired roles automatically. Filled positions disappear within a day.",
         },
         {
             "q": "Is this free for candidates?",
@@ -209,7 +258,7 @@ async def role_landing(
     title = f"{role} jobs — {total:,} live openings | ZammeJobs"
     description = (
         f"Browse {total:,} live {role} jobs from real employers. Direct apply, "
-        f"no third-party form. Updated every 12 hours."
+        f"no third-party form. Updated every few hours."
     )
     faqs = _faqs_role_city(role, None, None, total)
     breadcrumbs = [
@@ -250,7 +299,7 @@ async def city_landing(
     title = f"Jobs in {city} — {total:,} live openings | ZammeJobs"
     description = (
         f"Browse {total:,} live jobs in {city} from real employers. Direct apply, "
-        f"updated every 12 hours, no third-party form."
+        f"updated every few hours, no third-party form."
     )
     faqs = _faqs_role_city("", city, None, total)
     faqs[0] = {
@@ -309,7 +358,7 @@ async def role_in_city_landing(
     title = f"{role} jobs in {city} — {total:,} live openings | ZammeJobs"
     description = (
         f"{total:,} live {role} jobs in {city}. Direct apply on the employer's site, "
-        f"updated every 12 hours."
+        f"updated every few hours."
     )
     faqs = _faqs_role_city(role, city, None, total)
     breadcrumbs = [
@@ -331,6 +380,85 @@ async def role_in_city_landing(
         "total": total,
         "faqs": faqs,
         "breadcrumbs": breadcrumbs,
+        "json_ld": json_ld,
+        "canonical_url": canonical,
+    })
+
+
+# Curated high-intent SEO/AEO landing combos. These are the SERP-targeted
+# pages we actively want indexed first — chosen for high search volume in
+# Shazamme's recruitment-agency vertical. The combo path resolves via the
+# existing /jobs/<role>-in-<city> route; this list is what feeds the
+# /jobs/intent index and the curated entries in /sitemap-intent.xml.
+CURATED_INTENT_PAGES: list[dict] = [
+    {"label": "Nursing jobs in Australia", "slug": "nursing-in-australia"},
+    {"label": "Mining jobs in Western Australia", "slug": "mining-in-western-australia"},
+    {"label": "Procurement jobs in Melbourne", "slug": "procurement-in-melbourne"},
+    {"label": "Remote technology jobs in Australia", "slug": "remote-technology-in-australia"},
+    {"label": "Locum doctor jobs in Australia", "slug": "locum-doctor-in-australia"},
+    {"label": "Engineering jobs in Brisbane", "slug": "engineering-in-brisbane"},
+    {"label": "Recruitment jobs in Sydney", "slug": "recruitment-in-sydney"},
+    {"label": "Healthcare jobs in Sydney", "slug": "healthcare-in-sydney"},
+    {"label": "Construction jobs in Perth", "slug": "construction-in-perth"},
+    {"label": "Finance jobs in Sydney", "slug": "finance-in-sydney"},
+    {"label": "Marketing jobs in Melbourne", "slug": "marketing-in-melbourne"},
+    {"label": "Hospitality jobs in Brisbane", "slug": "hospitality-in-brisbane"},
+    {"label": "Aged care jobs in Australia", "slug": "aged-care-in-australia"},
+    {"label": "IT jobs in New Zealand", "slug": "it-in-new-zealand"},
+    {"label": "Engineering jobs in Auckland", "slug": "engineering-in-auckland"},
+    {"label": "Technology jobs in London", "slug": "technology-in-london"},
+    {"label": "Finance jobs in London", "slug": "finance-in-london"},
+    {"label": "Remote engineering jobs in United Kingdom", "slug": "remote-engineering-in-united-kingdom"},
+    {"label": "Software engineer jobs in United States", "slug": "software-engineer-in-united-states"},
+    {"label": "Sales jobs in New York", "slug": "sales-in-new-york"},
+]
+
+
+@router.get("/jobs/intent", response_class=HTMLResponse)
+async def intent_index(request: Request, session: AsyncSession = Depends(get_session)):
+    """Curated index of high-intent SEO landing pages. One link per combo;
+    each click routes through /jobs/<combo> to the live role+location page."""
+    items: list[dict] = []
+    for entry in CURATED_INTENT_PAGES:
+        slug = entry["slug"]
+        m = _ROLE_IN_CITY_RE.match(slug)
+        total = 0
+        if m:
+            total, _ = await _matching_jobs(
+                session,
+                role_slug=m.group("role"),
+                city_slug=m.group("city"),
+                limit=1,
+            )
+        items.append({
+            "label": entry["label"],
+            "url": _canonical_url(f"/jobs/{slug}"),
+            "path": f"/jobs/{slug}",
+            "count": total,
+        })
+
+    canonical = _canonical_url("/jobs/intent")
+    title = "High-intent job searches | ZammeJobs"
+    description = (
+        "Curated SEO/AEO landing pages for the most-searched job intents: nursing in "
+        "Australia, mining in Western Australia, engineering in Brisbane, and more."
+    )
+    json_ld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "@id": canonical,
+        "name": title,
+        "description": description,
+        "hasPart": [
+            {"@type": "WebPage", "name": it["label"], "url": it["url"]}
+            for it in items
+        ],
+    }, ensure_ascii=False)
+
+    return templates.TemplateResponse(request, "intent_index.html", {
+        "title": title,
+        "description": description,
+        "items": items,
         "json_ld": json_ld,
         "canonical_url": canonical,
     })

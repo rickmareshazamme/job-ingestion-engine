@@ -5,7 +5,7 @@
 {% block head_extra %}
 <link rel="alternate" hreflang="{{ country_lang }}" href="{{ request.base_url }}in/{{ country_code }}/" />
 <link rel="alternate" hreflang="x-default" href="{{ request.base_url }}" />
-<meta name="description" content="{{ '{:,}'.format(total_jobs) }} active jobs in {{ country_name }} indexed across Greenhouse, Workday, Lever and aggregators. Free, AI-searchable, no signup." />
+<meta name="description" content="{{ '{:,}'.format(total_jobs) }} active jobs in {{ country_name }} indexed from Shazamme-powered recruitment and staffing websites, with additional ATS and employer career site feeds being added. Free, AI-searchable, no signup." />
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -27,7 +27,7 @@
         {{ '{:,}'.format(total_jobs) }} active jobs in {{ country_name }}
     </div>
     <h1>Jobs in<br>{{ country_name }}.</h1>
-    <p>Every {{ country_name }} role from Workday, Greenhouse, Lever and {{ jobs_by_ats | length }} more sources. Salaries normalized to {{ country_currency }}. Free, no signup.</p>
+    <p>Every {{ country_name }} role from Shazamme-powered recruitment and staffing websites, with additional ATS and employer career site feeds being added. Salaries normalized to {{ country_currency }}. Free, no signup.</p>
 
     <div class="search-container">
         <form class="search-bar" action="/in/{{ country_code }}/search" method="get">

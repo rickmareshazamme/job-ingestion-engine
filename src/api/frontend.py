@@ -26,6 +26,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.schemas import JobLocation, JobSalary, JobSummary
 from src.db import get_session
 from src.models import Employer, Job
+from src.normalizer.salary import currency_for_country
+
+
+def _job_currency(job: Job) -> str:
+    """Resolve a display currency for a job: stored value, then country fallback,
+    then USD as last resort. Used so AU jobs aren't tagged USD just because the
+    salary string lacked an explicit currency.
+    """
+    if job.salary_currency:
+        return job.salary_currency
+    return currency_for_country(job.location_country) or "USD"
 
 logger = logging.getLogger("zammejobs.frontend")
 
@@ -152,7 +163,7 @@ def _build_faqs(job: Job, employer: Employer | None = None) -> list[dict]:
         })
 
     if job.salary_min or job.salary_max:
-        currency = job.salary_currency or "USD"
+        currency = _job_currency(job)
         period = (job.salary_period or "year").lower()
         if job.salary_min and job.salary_max and job.salary_min != job.salary_max:
             band = f"{currency} {job.salary_min:,}–{job.salary_max:,} per {period}"
@@ -226,23 +237,44 @@ def _build_json_ld(job: Job, employer: Employer | None = None) -> str:
         "hiringOrganization": {
             "@id": f"{job_canonical}#org",
         },
-        "jobLocation": {
-            "@type": "Place",
-            "address": {
-                "@type": "PostalAddress",
-                "addressLocality": job.location_city or "",
-                "addressRegion": job.location_state or "",
-                "addressCountry": job.location_country or "",
-            },
-        },
         "employmentType": job.employment_type or "FULL_TIME",
-        "directApply": True,
+        # Application is completed off-Google on the employer's ATS, so per
+        # Google's spec directApply must be false.
+        "directApply": False,
     }
 
-    if job.date_posted:
-        job_posting["datePosted"] = str(job.date_posted)[:10]
+    # jobLocation: only emit when we have a country (Google requires at
+    # least addressCountry). Drop empty address keys so the validator
+    # doesn't flag blank locality/region fields.
+    if job.location_country:
+        address: dict = {"@type": "PostalAddress", "addressCountry": job.location_country}
+        if job.location_city:
+            address["addressLocality"] = job.location_city
+        if job.location_state:
+            address["addressRegion"] = job.location_state
+        job_posting["jobLocation"] = {"@type": "Place", "address": address}
+
+    # datePosted is REQUIRED by Google. Fall back to crawl time for sources
+    # that don't expose a per-posting date (e.g. Shazamme feed).
+    posted = job.date_posted or job.date_crawled
+    if posted:
+        # ISO 8601 with timezone; Google recommends UTC Z notation.
+        try:
+            job_posting["datePosted"] = posted.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        except Exception:
+            job_posting["datePosted"] = str(posted)[:10]
+
+    # validThrough — supply a sensible default (posted + 30 days) when the
+    # source has no explicit expiry. Stops Google flagging the post as
+    # "missing validThrough" and prevents indefinite-life listings.
     if job.date_expires:
-        job_posting["validThrough"] = str(job.date_expires)[:10]
+        job_posting["validThrough"] = job.date_expires.strftime("%Y-%m-%dT%H:%M:%S+00:00") if hasattr(job.date_expires, "strftime") else str(job.date_expires)[:10]
+    elif posted:
+        from datetime import timedelta as _td
+        try:
+            job_posting["validThrough"] = (posted + _td(days=30)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        except Exception:
+            pass
     if job.source_url:
         job_posting["applicantContact"] = {
             "@type": "ContactPoint",
@@ -257,7 +289,7 @@ def _build_json_ld(job: Job, employer: Employer | None = None) -> str:
             value["maxValue"] = job.salary_max
         job_posting["baseSalary"] = {
             "@type": "MonetaryAmount",
-            "currency": job.salary_currency or "USD",
+            "currency": _job_currency(job),
             "value": value,
         }
 
@@ -332,7 +364,7 @@ def _build_json_ld(job: Job, employer: Employer | None = None) -> str:
             "estimatedSalary": {
                 "@type": "MonetaryAmountDistribution",
                 "name": "Salary",
-                "currency": job.salary_currency or "USD",
+                "currency": _job_currency(job),
                 "duration": _ISO8601_DURATION.get((job.salary_period or "year").lower(), "P1Y"),
                 "minValue": job.salary_min,
                 "maxValue": job.salary_max or job.salary_min,
@@ -373,7 +405,7 @@ def _job_to_template_obj(job: Job) -> dict:
         "salary": {
             "min": job.salary_min,
             "max": job.salary_max,
-            "currency": job.salary_currency,
+            "currency": _job_currency(job) if (job.salary_min or job.salary_max) else job.salary_currency,
             "period": job.salary_period,
         },
         "employment_type": job.employment_type,
@@ -889,22 +921,155 @@ async def employer_detail(
     )
     countries = [{"code": c, "name": _COUNTRY_NAMES.get(c, c), "count": n} for c, n in countries_result.all()]
 
+    # Top cities served by this employer (for "Locations served" block).
+    cities_result = await session.execute(
+        select(Job.location_city, Job.location_country, func.count(Job.id))
+        .where(Job.status == "active")
+        .where(Job.employer_id == uid)
+        .where(Job.location_city.isnot(None))
+        .where(Job.location_city != "")
+        .group_by(Job.location_city, Job.location_country)
+        .order_by(func.count(Job.id).desc())
+        .limit(12)
+    )
+    cities = [
+        {"name": row[0], "country": row[1], "count": row[2]}
+        for row in cities_result.all() if row[0]
+    ]
+
+    # Popular job categories (industry specialisms). categories is a
+    # Postgres TEXT[] — unnest it and count.
+    cat_rows = await session.execute(
+        text(
+            "SELECT unnest(categories) AS cat, COUNT(*) AS n "
+            "FROM jobs "
+            "WHERE employer_id = :uid AND status = 'active' AND categories IS NOT NULL "
+            "GROUP BY cat ORDER BY n DESC LIMIT 12"
+        ),
+        {"uid": uid},
+    )
+    categories_list = [
+        {"name": row[0], "count": row[1]}
+        for row in cat_rows.all() if row[0]
+    ]
+
+    # Synthesize a description if the employer record doesn't have one
+    # (the Employer model has no description column today). Built from
+    # the live data so it reflects current openings rather than stale copy.
+    bits: list[str] = [f"{employer.name} is hiring."]
+    if total:
+        bits.append(f"There are {total:,} active openings.")
+    if categories_list:
+        top_cats = ", ".join(c["name"] for c in categories_list[:4])
+        bits.append(f"Top specialisms: {top_cats}.")
+    if countries:
+        top_countries = ", ".join(c["name"] for c in countries[:4])
+        bits.append(f"Hiring across {top_countries}.")
+    if cities:
+        top_cities = ", ".join(c["name"] for c in cities[:5])
+        bits.append(f"Active in {top_cities}.")
+    description = " ".join(bits)
+
+    website = f"https://{employer.domain}" if employer.domain else None
+
+    faqs: list[dict] = []
+    faqs.append({
+        "q": f"How many jobs does {employer.name} have open?",
+        "a": f"{employer.name} currently has {total:,} active job listing{'s' if total != 1 else ''} indexed by ZammeJobs.",
+    })
+    if cities:
+        faqs.append({
+            "q": f"Where does {employer.name} hire?",
+            "a": (
+                f"Active hiring locations include "
+                f"{', '.join(c['name'] for c in cities[:5])}."
+            ),
+        })
+    if categories_list:
+        faqs.append({
+            "q": f"What roles does {employer.name} hire for?",
+            "a": (
+                "Recent openings span "
+                f"{', '.join(c['name'] for c in categories_list[:5])}."
+            ),
+        })
+    if website:
+        faqs.append({
+            "q": f"Where do I apply for {employer.name} jobs?",
+            "a": (
+                f"Click Apply on any listing on this page — you'll go straight to the "
+                f"role on {employer.name}'s own site ({website}). ZammeJobs never inserts a "
+                "middleman form."
+            ),
+        })
+
     employer_obj = {
         "id": str(employer.id),
         "name": employer.name,
         "domain": employer.domain,
+        "website": website,
         "logo_url": employer.logo_url,
         "ats_platform": employer.ats_platform,
         "career_page_url": employer.career_page_url,
         "country": employer.country,
+        "country_name": _COUNTRY_NAMES.get(employer.country or "", employer.country or ""),
         "initial": (employer.name[:1] or "?").upper(),
         "active_job_count": total,
+        "description": description,
+        "claimed": employer.claimed,
+    }
+
+    canonical = _canonical_url(f"/employers/{slug}")
+    org_schema = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": f"{canonical}#org",
+        "name": employer.name,
+        "url": website or canonical,
+        "sameAs": [website] if website else [],
+        "description": description,
+    }
+    if employer.logo_url:
+        org_schema["logo"] = employer.logo_url
+    if employer.country:
+        org_schema["address"] = {
+            "@type": "PostalAddress",
+            "addressCountry": employer.country,
+        }
+
+    breadcrumb_schema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Jobs", "item": _canonical_url("/")},
+            {"@type": "ListItem", "position": 2, "name": "Employers", "item": _canonical_url("/employers")},
+            {"@type": "ListItem", "position": 3, "name": employer.name, "item": canonical},
+        ],
+    }
+
+    faq_schema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": f["q"],
+                "acceptedAnswer": {"@type": "Answer", "text": f["a"]},
+            }
+            for f in faqs
+        ],
     }
 
     return templates.TemplateResponse(request, "employer_detail.html", {
         "employer": employer_obj,
         "jobs": jobs,
         "countries": countries,
+        "cities": cities,
+        "categories": categories_list,
+        "faqs": faqs,
+        "org_schema": json.dumps(org_schema, ensure_ascii=False),
+        "breadcrumb_schema": json.dumps(breadcrumb_schema, ensure_ascii=False),
+        "faq_schema": json.dumps(faq_schema, ensure_ascii=False),
         "meta": {"total": total, "page": page, "per_page": per_page, "total_pages": total_pages},
     })
 

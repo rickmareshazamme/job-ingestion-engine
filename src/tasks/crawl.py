@@ -526,6 +526,16 @@ def mark_stale_jobs():
     try:
         threshold = datetime.utcnow() - timedelta(days=30)
 
+        # Snapshot the IDs being expired so we can notify Google + IndexNow.
+        from sqlalchemy import select as sa_select
+        expiring_ids = [
+            r[0] for r in session.execute(
+                sa_select(Job.id)
+                .where(Job.status == "active")
+                .where(Job.date_updated < threshold)
+            ).all()
+        ]
+
         stmt = (
             update(Job)
             .where(Job.status == "active")
@@ -538,9 +548,34 @@ def mark_stale_jobs():
 
         expired_count = result.rowcount
         logger.info("Marked %d stale jobs as expired", expired_count)
+
+        if expiring_ids:
+            _notify_jobs_deleted(expiring_ids)
+
         return {"jobs_expired": expired_count}
     finally:
         session.close()
+
+
+def _notify_jobs_deleted(job_ids: list) -> None:
+    """Best-effort: tell Google Indexing API + IndexNow that JobPosting URLs
+    are gone. Caps Google calls to its 200/day free quota; IndexNow has no
+    practical limit so we submit all of them in one batch.
+    """
+    if not job_ids:
+        return
+    urls = [f"https://{settings.site_domain}/jobs/{jid}" for jid in job_ids]
+    try:
+        from src.indexing.indexnow import submit_urls as indexnow_submit
+        _run_async(indexnow_submit(urls))
+    except Exception as e:
+        logger.warning("IndexNow expiry dispatch failed: %s", str(e)[:120])
+    try:
+        from src.indexing.google import notify_url_deleted
+        for u in urls[:200]:
+            _run_async(notify_url_deleted(u))
+    except Exception as e:
+        logger.warning("Google Indexing expiry dispatch failed: %s", str(e)[:120])
 
 
 @celery_app.task
@@ -611,6 +646,7 @@ def validate_active_job_urls(sample_size: int = 500):
             session.commit()
         finally:
             session.close()
+        _notify_jobs_deleted(dead_ids)
 
     logger.info("Liveness sweep: %d checked, %d marked expired", len(rows), len(dead_ids))
     return {"checked": len(rows), "expired": len(dead_ids)}

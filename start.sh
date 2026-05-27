@@ -17,6 +17,7 @@ case "${RAILWAY_SERVICE_NAME:-web}" in
     # no-op on subsequent boots.
     python3 -m scripts.db_upgrade || true
     python3 -m scripts.sync_shazamme_visibility || true
+    python3 -m scripts.backfill_salary_currency || true
     python3 -m scripts.ensure_shazamme_source || true
     exec uvicorn src.app:app --host 0.0.0.0 --port "${PORT:-8000}"
     ;;

@@ -18,7 +18,7 @@ from typing import Optional
 class ParsedSalary:
     min_value: Optional[int] = None
     max_value: Optional[int] = None
-    currency: str = "USD"
+    currency: str = ""
     period: str = "YEAR"
     raw: str = ""
 
@@ -74,12 +74,43 @@ NUMBER_PATTERN = re.compile(r"[\d]+(?:[,.\s]\d+)*(?:k)?", re.IGNORECASE)
 
 
 def _extract_currency(text: str) -> str:
-    """Extract currency from text."""
+    """Extract currency from text. Returns "" when no symbol is present so
+    callers can fall back to a country-derived currency rather than blindly
+    assuming USD.
+    """
     # Check for multi-char symbols first (to avoid matching $ in AU$)
     for symbol in sorted(CURRENCY_SYMBOLS.keys(), key=len, reverse=True):
         if symbol in text or symbol.lower() in text.lower():
             return CURRENCY_SYMBOLS[symbol]
-    return "USD"
+    return ""
+
+
+COUNTRY_TO_CURRENCY = {
+    "US": "USD", "GB": "GBP", "AU": "AUD", "NZ": "NZD", "CA": "CAD",
+    "IE": "EUR", "DE": "EUR", "FR": "EUR", "NL": "EUR", "ES": "EUR",
+    "IT": "EUR", "PT": "EUR", "BE": "EUR", "AT": "EUR", "FI": "EUR",
+    "GR": "EUR", "LU": "EUR", "SK": "EUR", "SI": "EUR", "EE": "EUR",
+    "LV": "EUR", "LT": "EUR", "CY": "EUR", "MT": "EUR",
+    "IN": "INR", "JP": "JPY", "CN": "CNY", "HK": "HKD", "SG": "SGD",
+    "TW": "TWD", "KR": "KRW", "TH": "THB", "ID": "IDR", "MY": "MYR",
+    "PH": "PHP", "VN": "VND", "PK": "PKR", "BD": "BDT", "LK": "LKR",
+    "ZA": "ZAR", "NG": "NGN", "KE": "KES", "EG": "EGP", "MA": "MAD",
+    "BR": "BRL", "MX": "MXN", "AR": "ARS", "CL": "CLP", "CO": "COP",
+    "PE": "PEN", "UY": "UYU",
+    "CH": "CHF", "NO": "NOK", "SE": "SEK", "DK": "DKK", "IS": "ISK",
+    "PL": "PLN", "CZ": "CZK", "HU": "HUF", "RO": "RON", "BG": "BGN",
+    "HR": "EUR", "RS": "RSD", "UA": "UAH", "TR": "TRY",
+    "RU": "RUB", "BY": "BYN", "KZ": "KZT",
+    "AE": "AED", "SA": "SAR", "QA": "QAR", "KW": "KWD", "BH": "BHD",
+    "OM": "OMR", "IL": "ILS", "JO": "JOD", "LB": "LBP",
+}
+
+
+def currency_for_country(country_iso: Optional[str]) -> str:
+    """Return the ISO currency for a country code, or "" if unknown."""
+    if not country_iso:
+        return ""
+    return COUNTRY_TO_CURRENCY.get(country_iso.upper(), "")
 
 
 def _parse_number(num_str: str) -> Optional[int]:

@@ -192,3 +192,57 @@ app.include_router(frontend_router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "job-index", "version": APP_VERSION}
+
+
+# In-process Shazamme refresh loop. Railway only provisions the `web`
+# service for this project, so Celery beat is not running — without this
+# loop the feed only re-imports when the container restarts. Lightweight:
+# one wakeup per hour, dispatches a detached subprocess that handles its
+# own concurrency guard via the source_configs.last_crawl_at timestamp.
+@app.on_event("startup")
+async def _start_shazamme_refresh_loop():
+    import asyncio
+    import os
+    import subprocess
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import create_engine, text
+
+    from src.config import settings
+
+    async def _loop():
+        # Initial delay so boot work (db_upgrade, ensure_shazamme_source's
+        # own dispatch) settles before the loop joins in.
+        await asyncio.sleep(300)
+        while True:
+            try:
+                engine = create_engine(settings.database_url_sync)
+                with engine.connect() as conn:
+                    last_crawl = conn.execute(text(
+                        "SELECT last_crawl_at FROM source_configs "
+                        "WHERE source_type = 'shazamme_feed' LIMIT 1"
+                    )).scalar()
+                engine.dispose()
+
+                cutoff = datetime.utcnow() - timedelta(
+                    hours=settings.feed_crawl_interval_hours
+                )
+                if last_crawl is None or last_crawl < cutoff:
+                    log_path = "/tmp/shazamme_import.log"
+                    subprocess.Popen(
+                        ["python3", "-m", "scripts.import_shazamme"],
+                        stdout=open(log_path, "ab"),
+                        stderr=subprocess.STDOUT,
+                        start_new_session=True,
+                        env=os.environ.copy(),
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger("zammejobs.shazamme_loop").warning(
+                    "shazamme refresh loop tick failed: %s", str(e)[:200]
+                )
+            # Check every hour; the cutoff guard inside the loop enforces
+            # the configured cadence (feed_crawl_interval_hours).
+            await asyncio.sleep(3600)
+
+    asyncio.create_task(_loop())

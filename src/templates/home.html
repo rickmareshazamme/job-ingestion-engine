@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}ZammeJobs — Every Job, Every ATS, AI-Searchable{% endblock %}
-{% block meta_description %}Search {{ "{:,}".format(stats.active_jobs) }} jobs from Workday, Greenhouse, Lever — instantly. No paywalls, no signup. Free global job index, AI-searchable.{% endblock %}
+{% block meta_description %}Search {{ "{:,}".format(stats.active_jobs) }} live jobs from Shazamme-powered recruitment and staffing websites, with additional ATS and employer career site feeds being added. Free global job index, AI-searchable.{% endblock %}
 
 {% block head_extra %}
 <script type="application/ld+json">
@@ -34,7 +34,7 @@
     </div>
 
     <h1>Every job.<br>AI-searchable.</h1>
-    <p>Search {{ "{:,}".format(stats.active_jobs) }} jobs from Workday, Greenhouse, Lever &mdash; instantly. No paywalls, no signup.</p>
+    <p>ZammeJobs currently indexes {{ "{:,}".format(stats.active_jobs) }} live jobs from Shazamme-powered recruitment and staffing websites, with additional ATS and employer career site feeds being added.</p>
 
     <div class="search-container">
         <form class="search-bar" action="/search" method="get">

@@ -32,7 +32,22 @@ def main() -> None:
 
         if existing:
             source_id = str(existing)
-            print(f"ensure_shazamme_source: source_config exists ({source_id})", flush=True)
+            # Keep the source's interval in sync with the configured cadence —
+            # an older row may still carry the previous 12h default.
+            conn.execute(
+                text("""
+                    UPDATE source_configs
+                    SET crawl_interval_hours = :interval
+                    WHERE id = :id
+                      AND crawl_interval_hours > :interval
+                """),
+                {"interval": settings.feed_crawl_interval_hours, "id": existing},
+            )
+            print(
+                f"ensure_shazamme_source: source_config exists ({source_id}), "
+                f"interval pinned to {settings.feed_crawl_interval_hours}h",
+                flush=True,
+            )
         else:
             new_id = uuid.uuid4()
             conn.execute(text("""
@@ -55,11 +70,36 @@ def main() -> None:
             "SELECT COUNT(*) FROM jobs WHERE source_type = 'shazamme_feed'"
         )).scalar() or 0
 
+        last_crawl = conn.execute(text(
+            "SELECT last_crawl_at FROM source_configs WHERE source_type = 'shazamme_feed' LIMIT 1"
+        )).scalar()
+
     engine.dispose()
 
-    if shazamme_jobs > 0:
-        print(f"ensure_shazamme_source: {shazamme_jobs} Shazamme jobs already present, no dispatch", flush=True)
-        return
+    # Decide whether to (re)dispatch the import. We don't trust Celery beat
+    # to be running on Railway (worker/beat services aren't always
+    # provisioned), so the web boot owns refresh: if the latest crawl is
+    # older than feed_crawl_interval_hours, kick a fresh import.
+    needs_dispatch = False
+    if shazamme_jobs == 0:
+        needs_dispatch = True
+        reason = "no Shazamme jobs in DB yet"
+    elif last_crawl is None:
+        needs_dispatch = True
+        reason = "last_crawl_at is null"
+    else:
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=settings.feed_crawl_interval_hours)
+        if last_crawl < cutoff:
+            needs_dispatch = True
+            reason = f"last crawl {last_crawl} is older than {settings.feed_crawl_interval_hours}h"
+        else:
+            print(
+                f"ensure_shazamme_source: {shazamme_jobs} jobs present, last crawl "
+                f"{last_crawl} within {settings.feed_crawl_interval_hours}h — no dispatch",
+                flush=True,
+            )
+            return
 
     # Spawn the import as a detached subprocess so the web container
     # finishes booting in milliseconds while the 250MB feed downloads
@@ -77,8 +117,8 @@ def main() -> None:
         env=os.environ.copy(),
     )
     print(
-        f"ensure_shazamme_source: launched scripts.import_shazamme pid={proc.pid}, "
-        f"logging to {log_path}",
+        f"ensure_shazamme_source: launched scripts.import_shazamme pid={proc.pid} "
+        f"({reason}), logging to {log_path}",
         flush=True,
     )
 
