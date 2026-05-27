@@ -16,17 +16,14 @@
 
 <div class="employer-grid">
     {% for emp in employers %}
-    <div class="employer-card">
+    <a class="employer-card" href="/employers/{{ emp.id }}" style="text-decoration: none;">
         <h3>{{ emp.name }}</h3>
         <span class="domain">{{ emp.domain }}</span>
         {% if emp.ats_platform %}
         <span class="tag" style="margin-left: var(--space-sm);">{{ emp.ats_platform }}</span>
         {% endif %}
-        <div class="job-count">{{ emp.job_count }} active jobs</div>
-        {% if emp.career_page_url %}
-        <a href="{{ emp.career_page_url }}" target="_blank" rel="noopener" style="font-size: var(--text-sm); display: block; margin-top: var(--space-sm);">Career page</a>
-        {% endif %}
-    </div>
+        <div class="job-count">View {{ emp.job_count }} active job{{ '' if emp.job_count == 1 else 's' }} →</div>
+    </a>
     {% else %}
     <p style="color: var(--color-text-muted); padding: var(--space-2xl); grid-column: 1/-1; text-align: center;">No employers found.</p>
     {% endfor %}
