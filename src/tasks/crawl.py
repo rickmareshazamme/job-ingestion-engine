@@ -10,7 +10,7 @@ Features:
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from celery import Celery
 from sqlalchemy import select, update
@@ -48,6 +48,19 @@ from src.models import CrawlRun, Job, SourceConfig
 from src.normalizer.pipeline import normalize_job
 
 logger = logging.getLogger("jobindex.crawl")
+
+
+def _naive_utc(dt):
+    """Normalize a possibly tz-aware datetime to naive UTC.
+
+    timestamptz columns (last_crawl_at, last_sent_at) come back tz-aware, but
+    this module compares against naive datetime.utcnow(). Mixing the two raises
+    'can't compare offset-naive and offset-aware datetimes', which silently
+    aborted every crawl/alert run.
+    """
+    if dt is not None and dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 celery_app = Celery("job_ingestion", broker=settings.redis_url, backend=settings.redis_url)
 
@@ -353,7 +366,7 @@ def _is_circuit_open(session, config: SourceConfig) -> bool:
     # Check if cooldown has passed
     most_recent = recent_runs[0]
     if most_recent.completed_at:
-        cooldown_end = most_recent.completed_at + timedelta(hours=CIRCUIT_BREAKER_COOLDOWN_HOURS)
+        cooldown_end = _naive_utc(most_recent.completed_at) + timedelta(hours=CIRCUIT_BREAKER_COOLDOWN_HOURS)
         if datetime.utcnow() < cooldown_end:
             return True
 
@@ -765,7 +778,7 @@ def crawl_all_due_sources():
                 crawl_source.delay(str(config.id))
                 dispatched += 1
             else:
-                next_crawl = config.last_crawl_at + timedelta(hours=config.crawl_interval_hours)
+                next_crawl = _naive_utc(config.last_crawl_at) + timedelta(hours=config.crawl_interval_hours)
                 if datetime.utcnow() >= next_crawl:
                     crawl_source.delay(str(config.id))
                     dispatched += 1
@@ -809,7 +822,7 @@ def send_due_alerts():
         for alert in alerts:
             interval = cadence_hours.get(alert.cadence, 24)
             if alert.last_sent_at is not None:
-                next_due = alert.last_sent_at + timedelta(hours=interval)
+                next_due = _naive_utc(alert.last_sent_at) + timedelta(hours=interval)
                 if now < next_due:
                     skipped += 1
                     continue
