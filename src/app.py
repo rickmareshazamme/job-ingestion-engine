@@ -202,6 +202,7 @@ async def health():
 @app.on_event("startup")
 async def _start_shazamme_refresh_loop():
     import asyncio
+    import logging
     import os
     import subprocess
     from datetime import datetime, timedelta, timezone
@@ -210,42 +211,57 @@ async def _start_shazamme_refresh_loop():
 
     from src.config import settings
 
+    # This always-on, in-process loop is the authoritative refresh engine:
+    # no Redis/Celery dependency, self-healing, and immune to the Celery
+    # crawl's cosmetic last_crawl_at bumps because it gates on actual content
+    # freshness (MAX(jobs.date_updated), which every import stamps).
+    log = logging.getLogger("zammejobs.shazamme_loop")
+    CHECK_INTERVAL_S = 600  # re-check every 10 min so a due import fires
+                            # within ~10 min of becoming stale, not up to ~2h.
+
     async def _loop():
         # Initial delay so boot work (db_upgrade, ensure_shazamme_source's
         # own dispatch) settles before the loop joins in.
         await asyncio.sleep(300)
+        proc = None  # handle to the last import; prevents overlapping runs.
         while True:
             try:
+                # Don't launch a second 250MB import while one is still running.
+                if proc is not None and proc.poll() is None:
+                    log.info("shazamme import still running (pid=%s); skipping tick", proc.pid)
+                    await asyncio.sleep(CHECK_INTERVAL_S)
+                    continue
+
                 engine = create_engine(settings.database_url_sync)
                 with engine.connect() as conn:
-                    last_crawl = conn.execute(text(
-                        "SELECT last_crawl_at FROM source_configs "
-                        "WHERE source_type = 'shazamme_feed' LIMIT 1"
+                    last_import = conn.execute(text(
+                        "SELECT MAX(date_updated) FROM jobs "
+                        "WHERE source_type = 'shazamme_feed'"
                     )).scalar()
                 engine.dispose()
 
-                # timestamptz column → tz-aware; normalize to naive UTC.
-                if last_crawl is not None and last_crawl.tzinfo is not None:
-                    last_crawl = last_crawl.astimezone(timezone.utc).replace(tzinfo=None)
+                # date_updated (timestamptz) is stamped by every successful
+                # import; normalize to naive UTC for comparison.
+                if last_import is not None and last_import.tzinfo is not None:
+                    last_import = last_import.astimezone(timezone.utc).replace(tzinfo=None)
                 cutoff = datetime.utcnow() - timedelta(
                     hours=settings.feed_crawl_interval_hours
                 )
-                if last_crawl is None or last_crawl < cutoff:
+                if last_import is None or last_import < cutoff:
                     log_path = "/tmp/shazamme_import.log"
-                    subprocess.Popen(
+                    proc = subprocess.Popen(
                         ["python3", "-m", "scripts.import_shazamme"],
                         stdout=open(log_path, "ab"),
                         stderr=subprocess.STDOUT,
                         start_new_session=True,
                         env=os.environ.copy(),
                     )
+                    log.info(
+                        "launched scripts.import_shazamme pid=%s (last import %s, cutoff %s)",
+                        proc.pid, last_import, cutoff,
+                    )
             except Exception as e:
-                import logging
-                logging.getLogger("zammejobs.shazamme_loop").warning(
-                    "shazamme refresh loop tick failed: %s", str(e)[:200]
-                )
-            # Check every hour; the cutoff guard inside the loop enforces
-            # the configured cadence (feed_crawl_interval_hours).
-            await asyncio.sleep(3600)
+                log.warning("shazamme refresh loop tick failed: %s", str(e)[:200])
+            await asyncio.sleep(CHECK_INTERVAL_S)
 
     asyncio.create_task(_loop())

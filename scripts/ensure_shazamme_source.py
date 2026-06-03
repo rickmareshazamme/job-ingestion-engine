@@ -70,8 +70,12 @@ def main() -> None:
             "SELECT COUNT(*) FROM jobs WHERE source_type = 'shazamme_feed'"
         )).scalar() or 0
 
+        # Gate on real content freshness (max stamped job), not
+        # source_configs.last_crawl_at — the latter is bumped by the Celery
+        # crawl even when it imports nothing, which would wrongly suppress a
+        # needed boot import.
         last_crawl = conn.execute(text(
-            "SELECT last_crawl_at FROM source_configs WHERE source_type = 'shazamme_feed' LIMIT 1"
+            "SELECT MAX(date_updated) FROM jobs WHERE source_type = 'shazamme_feed'"
         )).scalar()
 
     engine.dispose()
