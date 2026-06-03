@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # Crawl settings
     default_crawl_interval_hours: int = 6
-    feed_crawl_interval_hours: int = 4
+    feed_crawl_interval_hours: int = 1
     headless_crawl_interval_hours: int = 24
     max_requests_per_second: float = 2.0
     stale_after_missed_runs: int = 3
