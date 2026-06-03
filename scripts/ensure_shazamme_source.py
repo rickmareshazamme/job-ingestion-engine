@@ -88,8 +88,12 @@ def main() -> None:
         needs_dispatch = True
         reason = "last_crawl_at is null"
     else:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         cutoff = datetime.utcnow() - timedelta(hours=settings.feed_crawl_interval_hours)
+        # last_crawl comes back tz-aware (timestamptz column); normalize to
+        # naive UTC so it compares against naive utcnow() without raising.
+        if last_crawl.tzinfo is not None:
+            last_crawl = last_crawl.astimezone(timezone.utc).replace(tzinfo=None)
         if last_crawl < cutoff:
             needs_dispatch = True
             reason = f"last crawl {last_crawl} is older than {settings.feed_crawl_interval_hours}h"

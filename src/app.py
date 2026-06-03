@@ -204,7 +204,7 @@ async def _start_shazamme_refresh_loop():
     import asyncio
     import os
     import subprocess
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from sqlalchemy import create_engine, text
 
@@ -224,6 +224,9 @@ async def _start_shazamme_refresh_loop():
                     )).scalar()
                 engine.dispose()
 
+                # timestamptz column → tz-aware; normalize to naive UTC.
+                if last_crawl is not None and last_crawl.tzinfo is not None:
+                    last_crawl = last_crawl.astimezone(timezone.utc).replace(tzinfo=None)
                 cutoff = datetime.utcnow() - timedelta(
                     hours=settings.feed_crawl_interval_hours
                 )
