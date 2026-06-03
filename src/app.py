@@ -265,3 +265,69 @@ async def _start_shazamme_refresh_loop():
             await asyncio.sleep(CHECK_INTERVAL_S)
 
     asyncio.create_task(_loop())
+
+    async def _freshness_watchdog():
+        """Independent of the refresh loop: if the feed goes stale beyond
+        freshness_alert_minutes, email alert_email. De-duped — one alert per
+        incident, with a re-nag every 6h while still stale, and a recovery
+        note when freshness returns. This is the tripwire that was missing
+        when ingestion silently froze for ~4 weeks."""
+        from src.services.email import send_email
+
+        await asyncio.sleep(900)  # let the boot import settle first
+        alerted_at = None  # naive-UTC time of last alert sent; None = healthy
+        RENAG_S = 6 * 3600
+        while True:
+            try:
+                engine = create_engine(settings.database_url_sync)
+                with engine.connect() as conn:
+                    last_import = conn.execute(text(
+                        "SELECT MAX(date_updated) FROM jobs "
+                        "WHERE source_type = 'shazamme_feed'"
+                    )).scalar()
+                engine.dispose()
+
+                if last_import is not None and last_import.tzinfo is not None:
+                    last_import = last_import.astimezone(timezone.utc).replace(tzinfo=None)
+                now = datetime.utcnow()
+                age_min = None if last_import is None else (now - last_import).total_seconds() / 60
+
+                stale = age_min is None or age_min > settings.freshness_alert_minutes
+                if stale:
+                    due = alerted_at is None or (now - alerted_at).total_seconds() > RENAG_S
+                    if due and settings.alert_email:
+                        age_txt = "unknown (no jobs)" if age_min is None else f"{int(age_min)} min"
+                        sent = await send_email(
+                            to=settings.alert_email,
+                            subject=f"⚠️ ZammeJobs feed stale — {age_txt} since last refresh",
+                            html=(
+                                f"<p>The Shazamme feed has not refreshed in <b>{age_txt}</b> "
+                                f"(threshold {settings.freshness_alert_minutes} min).</p>"
+                                f"<p>Check <a href=\"https://{settings.site_domain}/status.json\">/status.json</a> "
+                                f"and the web service logs.</p>"
+                            ),
+                            text=(
+                                f"ZammeJobs feed stale: {age_txt} since last refresh "
+                                f"(threshold {settings.freshness_alert_minutes} min). "
+                                f"Check https://{settings.site_domain}/status.json"
+                            ),
+                        )
+                        if sent:
+                            alerted_at = now
+                            log.warning("freshness watchdog: alert sent (age=%s)", age_txt)
+                elif alerted_at is not None:
+                    # Recovered — send an all-clear and reset.
+                    if settings.alert_email:
+                        await send_email(
+                            to=settings.alert_email,
+                            subject="✅ ZammeJobs feed recovered",
+                            html=f"<p>The Shazamme feed is refreshing again (age {int(age_min)} min).</p>",
+                            text=f"ZammeJobs feed recovered (age {int(age_min)} min).",
+                        )
+                    log.info("freshness watchdog: recovered (age=%d min)", int(age_min))
+                    alerted_at = None
+            except Exception as e:
+                log.warning("freshness watchdog tick failed: %s", str(e)[:200])
+            await asyncio.sleep(900)  # check every 15 min
+
+    asyncio.create_task(_freshness_watchdog())

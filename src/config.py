@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # source_type='shazamme_feed' — i.e. ZammeJobs ingests Shazamme tenant
     # jobs only. Aggregators/ATS connectors stay registered but idle.
     shazamme_only_ingestion: bool = True
+    # Freshness watchdog: email alert_email if the Shazamme feed hasn't been
+    # refreshed (max job date_updated) within freshness_alert_minutes. Guards
+    # against a silent ingestion stall going unnoticed.
+    alert_email: str = "rick@shazamme.com"
+    freshness_alert_minutes: int = 90
 
     # Aggregator API keys (all optional — connector self-disables if missing)
     adzuna_app_id: str = ""
