@@ -46,17 +46,25 @@ async def main():
     new_urls: list[str] = []
     seen_source_ids: set[str] = set()
 
-    for raw in raw_jobs:
-        if raw.source_id:
-            seen_source_ids.add(raw.source_id)
-        try:
-            job = await normalize_job(raw, do_geocode=False)
-        except Exception as e:
-            errs += 1
-            logger.warning("Normalize failed: %s", str(e)[:150])
-            continue
+    # One long-lived session with batched commits instead of a fresh
+    # session+commit per job. 38K individual transactions on the shared prod
+    # DB (while the web container also serves traffic) is slow enough that the
+    # import often never reaches the reconciliation step below. A per-row
+    # SAVEPOINT keeps one bad row from losing the whole in-flight batch.
+    BATCH = 500
+    processed = 0
+    s = Session()
+    try:
+        for raw in raw_jobs:
+            if raw.source_id:
+                seen_source_ids.add(raw.source_id)
+            try:
+                job = await normalize_job(raw, do_geocode=False)
+            except Exception as e:
+                errs += 1
+                logger.warning("Normalize failed: %s", str(e)[:150])
+                continue
 
-        with Session() as s:
             try:
                 stmt = insert(Job).values(
                     id=job.id, content_hash=job.content_hash,
@@ -82,26 +90,43 @@ async def main():
                           "salary_raw": job.salary_raw, "date_updated": datetime.utcnow(),
                           "status": "active", "raw_data": job.raw_data},
                 )
-                result = s.execute(stmt)
+                with s.begin_nested():
+                    result = s.execute(stmt)
                 if result.inserted_primary_key:
                     new += 1
                     new_urls.append(f"https://{settings.site_domain}/jobs/{job.id}")
                 else:
                     upd += 1
-                s.commit()
             except Exception as e:
                 errs += 1
                 logger.warning("Upsert failed: %s", str(e)[:150])
+                continue
 
-        if (new + upd) % 1000 == 0 and (new + upd) > 0:
-            logger.info("  progress: %d new + %d updated (%d errors)", new, upd, errs)
+            processed += 1
+            if processed % BATCH == 0:
+                s.commit()
+                logger.info("  progress: %d processed (%d new, %d upd, %d err)",
+                            processed, new, upd, errs)
+        s.commit()
+    finally:
+        s.close()
 
     logger.info("Shazamme import done: %d new, %d updated, %d errors", new, upd, errs)
 
     # Lifecycle: any active shazamme_feed job NOT in this fetch is no longer
     # live. Mark expired + notify Google/IndexNow so the URL drops out.
+    #
+    # Truncation guard: the Shazamme feed intermittently truncates and
+    # self-heals (job-index deep-offset bug). Only reconcile when the pull is
+    # a plausibly-complete snapshot — a short feed must NOT mass-expire live
+    # jobs. Healthy feed ~38K; the flap drops to ~6K, below reconcile_min_jobs.
     expired_urls: list[str] = []
-    if seen_source_ids:
+    if seen_source_ids and len(seen_source_ids) < settings.reconcile_min_jobs:
+        logger.warning(
+            "Reconcile SKIPPED: only %d jobs in feed (< floor %d) — suspected truncation",
+            len(seen_source_ids), settings.reconcile_min_jobs,
+        )
+    elif seen_source_ids:
         from sqlalchemy import select, update as sa_update
         from datetime import datetime as _dt
         with Session() as s:

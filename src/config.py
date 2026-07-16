@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # the last good pull, it's treated as a partial/truncated feed and
     # reconciliation is skipped so it can't wrongly expire live jobs.
     reconcile_min_ratio: float = 0.8
+    # Absolute floor for the standalone import reconciliation (import_shazamme).
+    # If a feed pull yields fewer than this many jobs it's treated as a
+    # partial/truncated feed and reconciliation is skipped, so a short feed
+    # can't mass-expire live jobs. Healthy full feed is ~38K; the known
+    # truncation flap drops to ~6K, well below this floor.
+    reconcile_min_jobs: int = 20000
     # Freshness watchdog: email alert_email if the Shazamme feed hasn't been
     # refreshed (max job date_updated) within freshness_alert_minutes. Guards
     # against a silent ingestion stall going unnoticed.
