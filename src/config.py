@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # source_type='shazamme_feed' — i.e. ZammeJobs ingests Shazamme tenant
     # jobs only. Aggregators/ATS connectors stay registered but idle.
     shazamme_only_ingestion: bool = True
+    # Feed-snapshot reconciliation guard. After a full shazamme_feed pull,
+    # active jobs absent from the pull are expired — but ONLY if the pull is a
+    # plausibly-complete snapshot. If the pull is smaller than this fraction of
+    # the last good pull, it's treated as a partial/truncated feed and
+    # reconciliation is skipped so it can't wrongly expire live jobs.
+    reconcile_min_ratio: float = 0.8
     # Freshness watchdog: email alert_email if the Shazamme feed hasn't been
     # refreshed (max job date_updated) within freshness_alert_minutes. Guards
     # against a silent ingestion stall going unnoticed.

@@ -178,10 +178,14 @@ def crawl_source(self, source_config_id: str):
             jobs_new = 0
             jobs_updated = 0
             new_urls: list[str] = []
+            seen_source_ids: set[str] = set()
+            prev_job_count = config.last_crawl_job_count or 0
 
             for raw_job in raw_jobs:
                 try:
                     job = _run_async(normalize_job(raw_job, do_geocode=False))
+                    if job.source_id:
+                        seen_source_ids.add(job.source_id)
                     result = _upsert_job(session, job)
                     if result == "new":
                         jobs_new += 1
@@ -192,6 +196,32 @@ def crawl_source(self, source_config_id: str):
                     logger.warning("Failed to normalize/upsert job from %s: %s", source_desc, str(e)[:100])
 
             session.commit()
+
+            # Feed-snapshot reconciliation. A Shazamme feed pull is a COMPLETE
+            # snapshot of currently-open jobs, so any active shazamme_feed job
+            # whose source_id is absent from this pull has left the feed and is
+            # expired. Without this the hourly crawler only ever upserts, so
+            # closed jobs linger until the 30-day mark_stale_jobs timer —
+            # inflating the active index (Aequor showed 32.5K vs 9.3K live).
+            # Guarded by _should_reconcile so a truncated feed can't mass-expire.
+            if config.source_type == "shazamme_feed" and seen_source_ids:
+                if _should_reconcile(prev_job_count, len(raw_jobs), settings.reconcile_min_ratio):
+                    expired_ids = _reconcile_feed_snapshot(
+                        session, config.source_type, seen_source_ids
+                    )
+                    if expired_ids:
+                        logger.info(
+                            "Reconcile: expired %d %s jobs no longer in feed",
+                            len(expired_ids), source_desc,
+                        )
+                        _notify_jobs_deleted(expired_ids)
+                else:
+                    logger.warning(
+                        "Reconcile SKIPPED for %s: pull %d < %.0f%% of last good %d "
+                        "(suspected feed truncation)",
+                        source_desc, len(raw_jobs),
+                        settings.reconcile_min_ratio * 100, prev_job_count,
+                    )
 
             # Push new URLs to IndexNow + Google Indexing API. Best-effort —
             # failures don't fail the crawl.
@@ -332,6 +362,48 @@ def _upsert_job(session, job: Job) -> str:
 
     session.execute(stmt)
     return "new"  # PostgreSQL doesn't easily distinguish insert vs update in on_conflict
+
+
+def _should_reconcile(prev_count: int, curr_count: int, min_ratio: float) -> bool:
+    """Truncation guard for feed-snapshot reconciliation.
+
+    A Shazamme feed pull is a complete snapshot, so we normally expire any
+    active job missing from it. But the feed intermittently truncates (see
+    job-index deep-offset bug), and a short pull must NOT be allowed to expire
+    thousands of live jobs. Reconcile only when there's no prior baseline yet,
+    or this pull is at least `min_ratio` of the last good pull.
+    """
+    if not prev_count:
+        return True
+    return curr_count >= prev_count * min_ratio
+
+
+def _reconcile_feed_snapshot(session, source_type: str, seen_source_ids: set) -> list:
+    """Expire active jobs of `source_type` whose source_id was absent from the
+    latest full feed pull. Returns the expired job IDs.
+
+    Only safe for full-snapshot feeds (Shazamme) — never for paginated
+    connectors that emit partial per-page results.
+    """
+    rows = session.execute(
+        select(Job.id, Job.source_id)
+        .where(Job.source_type == source_type)
+        .where(Job.status == "active")
+    ).all()
+    stale_ids = [r[0] for r in rows if r[1] and r[1] not in seen_source_ids]
+    if not stale_ids:
+        return []
+
+    CHUNK = 5000
+    for i in range(0, len(stale_ids), CHUNK):
+        batch = stale_ids[i:i + CHUNK]
+        session.execute(
+            update(Job)
+            .where(Job.id.in_(batch))
+            .values(status="expired", date_updated=datetime.utcnow())
+        )
+    session.commit()
+    return stale_ids
 
 
 def _record_failure(session, crawl_run, config, start_time, error_msg, permanent=False):
