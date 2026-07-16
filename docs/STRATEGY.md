@@ -467,22 +467,125 @@ We're not a job board. We're not a social network. We're **job data infrastructu
 
 ---
 
-## 6. Revenue Model
+## 6. Commercial Access & Entitlement Model
 
-### 6.1 Freemium Structure
+ZammeJobs must support different access and profile entitlements for Shazamme clients and non-clients.
 
-| Tier | Price | Features |
-|---|---|---|
-| **Free** | $0 | Unlimited job listings (auto-indexed), basic employer profile, included in AI search, basic API (1K req/day) |
-| **Pro** | $99/month | Featured placement, employer branding page, analytics dashboard (views/clicks/applies), enhanced API (50K req/day), priority crawling |
-| **Enterprise** | $499/month | Candidate matching, bulk API access, ATS webhook integration, custom branding, dedicated support, SLA |
+**Clean commercial position:** Every recruitment company can be discovered. Shazamme clients get the full profile included. Everyone else pays to claim, enhance and manage theirs. This gives ZammeJobs broad coverage without giving away the valuable part.
 
-### 6.2 Additional Revenue Streams
+### 6.1 Core Commercial Rules
 
-- **API usage fees:** Beyond free tier, charge per 1,000 requests.
-- **Sponsored listings:** Employers pay for featured placement in search results and AI responses.
-- **Data insights:** Anonymized hiring trends, salary benchmarks, ATS adoption data sold to research firms.
-- **Recruitment tools:** Resume matching, candidate screening, outreach automation (Phase 3+).
+- All eligible recruitment agencies may have a **basic public company page** on ZammeJobs.
+- A basic public company page may be created **automatically** from public information, live job feeds and existing ZammeJobs data.
+- Recruitment agencies **do not need to be paying customers** to appear on ZammeJobs.
+- **Shazamme clients** receive access to the upgraded ZammeJobs profile and platform features **at no additional charge** while they remain an active Shazamme client.
+- **Non-Shazamme clients** must register and pay to claim, manage or upgrade their profile.
+- Payment **must not influence** factual rankings, hiring activity data, editorial comparisons or inclusion in objective lists.
+- Paid profiles may contain more complete information and additional promotional features, but must **not** be falsely presented as more credible purely because they are paid.
+- Sponsored placements must **always be clearly labelled**.
+
+### 6.2 Basic Public Recruitment Agency Page
+
+Create a free basic page for recruitment agencies where sufficient verified or public data exists.
+
+The basic page may include: company name, company logo (where legally permitted), company website, company type, basic company description, main sectors, main locations, current live jobs, job count, link to the company website, link to current vacancies, date last updated, profile status, and a claim/upgrade profile button.
+
+- Basic pages may be **unclaimed**.
+- Basic pages must clearly distinguish between: **platform-generated**, **publicly sourced**, **company-supplied**, and **verified** information.
+- The existence of a basic profile must **not imply** that the company is a ZammeJobs or Shazamme customer.
+
+### 6.3 Shazamme Client Access
+
+Active Shazamme clients should receive upgraded ZammeJobs access without paying a separate ZammeJobs subscription.
+
+Create an **entitlement system** to identify an active Shazamme client. Possible entitlement sources: existing Shazamme account relationship, shared customer identifier, CRM/billing integration, admin-assigned entitlement, approved company domain, or an API/webhook from the Shazamme platform. **Do not rely only on an email domain** where a stronger customer identifier is available.
+
+An active Shazamme client entitlement should unlock: profile claiming, verified profile workflow, full company profile management, multiple company administrators, expanded sectors & specialisms, office locations, consultant profiles, leadership profiles, awards, accreditations, case studies, salary guides, market reports, videos & transcripts, FAQs, additional contact options, enhanced branding, profile completeness tools, profile analytics, job referral analytics, website referral analytics, priority data refresh, profile verification, and access to future standard upgrade features.
+
+The account should display **"Included with your active Shazamme subscription."** Do **not** show a separate ZammeJobs charge to eligible Shazamme clients.
+
+### 6.4 Non-Client Registration & Payment
+
+Non-Shazamme clients may **view** public ZammeJobs content without paying. They must register and purchase an upgrade to: claim/edit/manage a company profile, add enhanced company information, access profile analytics, add consultant profiles, case studies, salary guides, reports, videos and FAQs, receive verification, and access enhanced promotional features.
+
+**Registration & upgrade journey:**
+1. User selects "Claim this profile" or "Upgrade this profile."
+2. User creates an account.
+3. User verifies their email address.
+4. User declares their relationship with the company.
+5. User submits company verification information.
+6. The platform **checks whether the company is an active Shazamme client**.
+7. If an active Shazamme client → upgrade granted at **no additional charge**.
+8. If not a Shazamme client → user is shown the available paid plans.
+9. Payment is completed.
+10. The claim enters **moderation**.
+11. Once approved, the user receives company management access.
+
+**Do not require payment before checking whether the company is entitled to free Shazamme client access.**
+
+### 6.5 Profile Tiers
+
+**Basic public profile** — available to all eligible recruitment agencies. Public company page, basic details, current live jobs, main sectors, main locations, company website link, claim option. May be generated and maintained by ZammeJobs.
+
+**Upgraded profile** — included free for active Shazamme clients; available as a paid subscription for non-clients. Claimed + verified profile, full editing, expanded overview, additional sectors/specialisms, multiple office locations, consultant/leadership profiles, awards & accreditations, case studies, salary guides, reports, videos, FAQs, enhanced branding, analytics, referral reporting, more frequent updates, profile completeness recommendations.
+
+**Premium visibility package** — optional paid add-on for both Shazamme clients and non-clients. Sponsored placement, featured company positions, sponsored editorial, newsletter inclusion, campaign promotion, enhanced market report participation, additional content production, advanced visibility reporting. Premium visibility features must be **clearly labelled where they affect placement** and must **not alter factual rankings or objective market data**.
+
+### 6.6 Entitlement Data Model
+
+Add or reuse data structures for: `Account`, `Company`, `CompanyMembership`, `CompanyClaim`, `Subscription`, `SubscriptionPlan`, `CustomerEntitlement`, `EntitlementSource`, `BillingCustomer`, `BillingSubscription`, `FeatureAccess`, `SponsoredPlacement`.
+
+Suggested `CustomerEntitlement` fields: `company_id`, `entitlement_type`, `source`, `external_customer_id`, `starts_at`, `expires_at`, `status`, `last_verified_at`, `created_by`, `notes`.
+
+- **Entitlement types:** `basic_public_profile`, `shazamme_client_upgrade`, `paid_zammejobs_upgrade`, `premium_visibility`, `admin_granted`, `trial`.
+- **Entitlement statuses:** `active`, `pending`, `expired`, `cancelled`, `suspended`, `grace_period`.
+
+### 6.7 Shazamme Client Status Changes
+
+**When a company becomes a Shazamme client:** detect/receive the updated status, activate the free upgraded entitlement, remove the need for a separate ZammeJobs subscription, preserve existing profile content, prevent duplicate billing, notify the administrator.
+
+**When a company stops being a Shazamme client:** do **not** immediately delete profile/content; apply a **configurable grace period** (default **30 days** after the entitlement expires); notify administrators; offer conversion to a paid ZammeJobs subscription; preserve the public basic profile; restrict upgraded management features after the grace period; preserve data so it can be restored if the company re-subscribes.
+
+### 6.8 Billing Safeguards
+
+Prevent: a Shazamme client being charged for an included upgraded profile; duplicate subscriptions for the same company; multiple users purchasing separate plans for the same profile; access continuing indefinitely after failed payment; profile deletion immediately after cancellation; payment changing factual rankings; paid users editing system-generated statistics.
+
+Before creating a paid subscription, **check**: existing Shazamme client entitlement, existing company subscription, pending company claim, existing company administrator, existing billing customer record.
+
+### 6.9 Public Labels
+
+Use clear labels: `Unclaimed profile`, `Claimed profile`, `Verified information`, `Information supplied by the company`, `Sponsored`, `Featured`, `ZammeJobs data`, `Last updated`, `Last verified`.
+
+Do **not** display "Trusted company", "Recommended company", "Best company", or "Top agency" unless supported by a **published, objective methodology**. Do not publicly label companies as paying or non-paying unless required for a sponsored disclosure.
+
+### 6.10 Admin Controls
+
+Administrators must be able to: mark a company as an active Shazamme client; connect a company to an external Shazamme customer ID; grant/revoke an included upgrade; apply a grace period; convert an included entitlement to a paid subscription; resolve duplicate subscriptions; merge duplicate company profiles; view entitlement history; view billing status; grant temporary access; suspend access; preserve the public basic profile; override access in exceptional cases (recording the reason). **All entitlement and billing changes must be recorded in the audit log.**
+
+### 6.11 UI Requirements
+
+- **Unclaimed basic profile:** "Is this your company?" · "Claim and upgrade this profile" · "Shazamme clients receive upgraded access at no additional cost".
+- **Logged-in Shazamme client:** "Your upgraded ZammeJobs profile is included with Shazamme" · "Complete your profile" · "Verify your company information".
+- **Logged-in non-client:** current plan, upgrade options, included features, billing status, renewal date, cancellation controls.
+- **Never block** public users from viewing jobs or basic company pages.
+
+### 6.12 Acceptance Criteria
+
+The commercial access system is complete when:
+- Eligible recruitment agencies can have a basic public page.
+- A company can appear without being a customer.
+- A company representative can attempt to claim a profile.
+- The platform checks Shazamme client status **before** requesting payment.
+- Active Shazamme clients receive upgraded access for free.
+- Non-clients can purchase upgraded access.
+- A company cannot be charged twice.
+- Multiple users can be assigned to an upgraded company profile.
+- Paid status does not change factual rankings.
+- Sponsored placements are labelled.
+- A cancelled or expired company retains its basic public page.
+- A former Shazamme client can convert to a paid ZammeJobs plan.
+- Entitlement changes are audited.
+- Billing and access rules are covered by automated tests.
 
 ---
 
